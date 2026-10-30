@@ -53,7 +53,7 @@ export class Recorder {
 }
 
 /** RMS loudness of a PCM chunk, 0..1 (a quiet room is ~0.005, speech ~0.03-0.2). */
-function rms(pcm: Uint8Array): number {
+export function rms(pcm: Uint8Array): number {
   const view = new DataView(pcm.buffer, pcm.byteOffset, pcm.byteLength)
   const n = Math.floor(pcm.byteLength / 2)
   if (!n) return 0

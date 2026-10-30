@@ -1,6 +1,5 @@
-import { ImageRawDataUpdate, type EvenAppBridge } from '@evenrealities/even_hub_sdk'
 import type { Display } from './display'
-import { GLYPHS, ID, REACTOR, removeReactor } from './layout'
+import { GLYPHS, ID } from './layout'
 import { REACTOR_FRAMES, reactorFrame } from './reactor'
 import { sleep, typewrite } from './typewriter'
 
@@ -13,8 +12,9 @@ const POWER = '▁▂▃▄▅▆▇█'
  * 1. Arc reactor spins up, brackets draw in, power bar fills.
  * 2. Initialising: systems check.
  * 3. EDITH appears: E.D.I.T.H. // ONLINE, tagline, greeting.
+ * Expects the display to be on the 'boot' layout; leaves it on 'hud'.
  */
-export async function boot(bridge: EvenAppBridge, display: Display, checks: Check[], greeting: string) {
+export async function boot(display: Display, checks: Check[], greeting: string) {
   const t0 = performance.now()
 
   // Act 1: the reactor. Brackets grow alongside the first frames.
@@ -28,15 +28,14 @@ export async function boot(bridge: EvenAppBridge, display: Display, checks: Chec
     void display.set(ID.bl, GLYPHS.bl.slice(0, g))
     void display.set(ID.br, GLYPHS.br.slice(0, g))
     void display.set(ID.header, `ARC REACTOR  ${POWER.slice(0, bars)}`)
-    imagesOk = await sendImage(bridge, await reactorFrame(n))
+    imagesOk = await display.image(ID.reactor, await reactorFrame(n))
     await sleep(160)
   }
   await display.set(ID.header, 'ARC REACTOR  ONLINE')
   await sleep(imagesOk ? 700 : 300)
 
-  // The image must go before any body text: even all-black, it hides what's behind it.
-  // Rebuilding drops it; brackets and footer are kept.
-  const kept = await removeReactor(bridge, {
+  // Drop the reactor image (rebuild to the plain HUD), keeping brackets and footer.
+  const kept = await display.setLayout('hud', {
     [ID.tl]: GLYPHS.tl,
     [ID.tr]: GLYPHS.tr,
     [ID.bl]: GLYPHS.bl,
@@ -68,18 +67,4 @@ export async function boot(bridge: EvenAppBridge, display: Display, checks: Chec
 
   // Bluetooth latency on hardware will differ from the simulator; compare here.
   console.log(`[boot] done in ${Math.round(performance.now() - t0)}ms${imagesOk ? '' : ' (no reactor image)'}`)
-}
-
-/** Sends one frame; false means skip the rest of the image animation (text boot still runs). */
-async function sendImage(bridge: EvenAppBridge, png: Uint8Array): Promise<boolean> {
-  try {
-    const result = await bridge.updateImageRawData(
-      new ImageRawDataUpdate({ containerID: ID.reactor, containerName: REACTOR.name, imageData: png }),
-    )
-    if (String(result) === 'success') return true
-    console.warn('[boot] reactor frame rejected:', result)
-  } catch (err) {
-    console.warn('[boot] reactor frame failed:', err)
-  }
-  return false
 }

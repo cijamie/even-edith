@@ -1,11 +1,36 @@
 import type { Agenda } from '../data/agenda'
+import type { Memory } from '../data/memory'
+import type { Locator } from '../geo/location'
 import type { Settings } from '../settings'
 import { localIso, spokenDuration } from '../util/time'
 import { currencyDeclaration, convertCurrency } from './currency'
-import { getWeather, weatherDeclaration } from './weather'
+import { getWeather, weatherAt, weatherDeclaration } from './weather'
+import { webLookup } from './web'
 
-/** What the tools can touch. `actions` lets a tool ask the HUD to do something (e.g. open the dashboard). */
-export type ToolContext = { agenda: Agenda; settings: Settings; actions: Set<'dashboard'> }
+export const PROTOCOLS = ['standard', 'focus', 'night', 'stealth'] as const
+export type Protocol = (typeof PROTOCOLS)[number]
+
+/** Things a tool can ask the HUD to do once the reply is ready. */
+export type Action =
+  | { type: 'dashboard' }
+  | { type: 'map' }
+  | { type: 'radar'; category: string }
+  | { type: 'captions'; translate: boolean }
+  | { type: 'meeting' }
+  | { type: 'teleprompter' }
+  | { type: 'briefing' }
+  | { type: 'protocol'; name: Protocol; minutes?: number }
+
+/** What the tools can touch. */
+export type ToolContext = {
+  agenda: Agenda
+  memory: Memory
+  settings: Settings
+  locator: Locator
+  /** Glasses battery etc., filled in from the SDK. */
+  deviceStatus: () => Record<string, unknown>
+  actions: Action[]
+}
 
 type Tool = { declaration: object; run: (args: any, ctx: ToolContext) => Promise<unknown> }
 
@@ -20,34 +45,123 @@ function parseTime(value: string): number {
   return ms
 }
 
+/** A tool that only switches the HUD to a view. */
+const view = (name: string, description: string, action: (args: any) => Action, parameters = obj({})): Tool => ({
+  declaration: { name, description, parameters },
+  async run(args, { actions }) {
+    actions.push(action(args))
+    return { opened: true, note: 'Reply with a very short acknowledgement only.' }
+  },
+})
+
+export const RADAR_CATEGORIES: Record<string, string> = {
+  cafe: 'amenity:cafe',
+  restaurant: 'amenity:restaurant',
+  pub: 'amenity:pub',
+  pharmacy: 'amenity:pharmacy',
+  atm: 'amenity:atm',
+  toilets: 'amenity:toilets',
+  fuel: 'amenity:fuel',
+  parking: 'amenity:parking',
+  supermarket: 'shop:supermarket',
+  bus_stop: 'highway:bus_stop',
+  station: 'railway:station',
+  hotel: 'tourism:hotel',
+}
+
 const tools: Record<string, Tool> = {
   get_weather: {
     declaration: {
       ...weatherDeclaration,
-      parameters: obj({ location: str('Place name. Omit to use the user\'s home city.') }),
+      parameters: obj({ location: str("Place name. Omit for the user's current location (or home city).") }),
     },
-    async run({ location }, { settings }) {
-      const place = location || (await settings.homeCity())
-      if (!place) return { error: 'No location given and no home city set. Ask which city, or suggest setting a home city in the phone app.' }
-      return getWeather({ location: place })
+    async run({ location }, { settings, locator }) {
+      if (location) return getWeather({ location })
+      const fix = await locator.get(10 * 60_000)
+      if (fix && fix.source !== 'home') return weatherAt(fix.lat, fix.lon, 'current location')
+      const home = await settings.homeCity()
+      if (home) return getWeather({ location: home })
+      return { error: 'No location available and no home city set. Ask which city.' }
     },
   },
 
   convert_currency: { declaration: currencyDeclaration, run: (args) => convertCurrency(args) },
 
-  open_dashboard: {
+  web_lookup: {
     declaration: {
-      name: 'open_dashboard',
+      name: 'web_lookup',
       description:
-        'Show the dashboard (time, weather, timers, reminders, calendar, latest note) on the glasses. ' +
-        'Use when the user asks to open, show or bring up the dashboard, or for an overview of their day.',
-      parameters: obj({}),
+        'Look something up on Wikipedia and DuckDuckGo instant answers. Use for facts you are unsure of, people, places, ' +
+        'definitions and anything after your training. It is not a live news feed.',
+      parameters: obj({ query: str('Search query') }, ['query']),
     },
-    async run(_args, { actions }) {
-      actions.add('dashboard')
-      return { opened: true, note: 'Reply with a very short acknowledgement only.' }
+    run: (args) => webLookup(args),
+  },
+
+  remember: {
+    declaration: {
+      name: 'remember',
+      description: 'Store a long-term fact about the user or something they want remembered (e.g. "parked on level 3", "allergic to peanuts").',
+      parameters: obj({ fact: str('The fact, phrased in third person or as a short statement') }, ['fact']),
+    },
+    async run({ fact }, { memory }) {
+      const f = await memory.add(fact)
+      return { remembered: f.text, id: f.id }
     },
   },
+
+  forget: {
+    declaration: {
+      name: 'forget',
+      description: 'Forget a stored fact by its id (ids are shown in brackets in your memory list).',
+      parameters: obj({ id: str('Fact id') }, ['id']),
+    },
+    async run({ id }, { memory }) {
+      return { forgotten: await memory.remove(id) }
+    },
+  },
+
+  device_status: {
+    declaration: { name: 'device_status', description: 'Glasses battery, charging and wearing status.', parameters: obj({}) },
+    async run(_args, { deviceStatus }) {
+      return deviceStatus()
+    },
+  },
+
+  open_dashboard: view(
+    'open_dashboard',
+    'Show the dashboard (time, weather, timers, reminders, calendar, latest note, battery). Use for "open dashboard" or an overview of the day.',
+    () => ({ type: 'dashboard' }),
+  ),
+  open_map: view('open_map', 'Show a map of where the user is right now, from the phone location.', () => ({ type: 'map' })),
+  open_radar: view(
+    'open_radar',
+    `Radar of nearby places of one type, with distance and direction. Categories: ${Object.keys(RADAR_CATEGORIES).join(', ')}.`,
+    ({ category }) => ({ type: 'radar', category: RADAR_CATEGORIES[category] ? category : 'cafe' }),
+    obj({ category: { type: 'string', enum: Object.keys(RADAR_CATEGORIES) } }, ['category']),
+  ),
+  start_captions: view(
+    'start_captions',
+    'Live captions of what people nearby are saying. translate=true translates any language into English.',
+    ({ translate }) => ({ type: 'captions', translate: !!translate }),
+    obj({ translate: { type: 'boolean' } }),
+  ),
+  start_meeting: view(
+    'start_meeting',
+    'Record a meeting or conversation; when stopped, it is transcribed and summarised into a note with action items.',
+    () => ({ type: 'meeting' }),
+  ),
+  open_teleprompter: view('open_teleprompter', 'Show the teleprompter script saved in the phone app, paged with swipes.', () => ({
+    type: 'teleprompter',
+  })),
+  briefing: view('briefing', 'Give the daily briefing (weather, schedule, reminders).', () => ({ type: 'briefing' })),
+  set_protocol: view(
+    'set_protocol',
+    'Switch protocol. focus: Pomodoro countdown (default 25 min) with nudges held back. night: dim display. ' +
+      'stealth: minimal display, chrome hidden. standard: back to normal.',
+    ({ name, minutes }) => ({ type: 'protocol', name: PROTOCOLS.includes(name) ? name : 'standard', minutes }),
+    obj({ name: { type: 'string', enum: [...PROTOCOLS] }, minutes: { type: 'integer', description: 'Focus length' } }, ['name']),
+  ),
 
   set_timer: {
     declaration: {

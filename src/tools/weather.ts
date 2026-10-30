@@ -51,15 +51,19 @@ export async function getWeather({ location }: { location: string }) {
   )
   const place = geo.results?.[0]
   if (!place) return { error: `No place called "${location}" found.` }
+  return weatherAt(place.latitude, place.longitude, [place.name, place.admin1, place.country].filter(Boolean).join(', '))
+}
 
+/** Weather for coordinates, e.g. the phone's current location. */
+export async function weatherAt(lat: number, lon: number, label: string) {
   const w = await requestJson<any>(
-    `https://api.open-meteo.com/v1/forecast?latitude=${place.latitude}&longitude=${place.longitude}` +
+    `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}` +
       '&current=temperature_2m,apparent_temperature,weather_code,wind_speed_10m,precipitation' +
       '&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max,weather_code' +
       '&forecast_days=1&timezone=auto',
   )
   return {
-    place: [place.name, place.admin1, place.country].filter(Boolean).join(', '),
+    place: label,
     localTime: w.current?.time,
     now: {
       temperatureC: w.current?.temperature_2m,

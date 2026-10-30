@@ -1,7 +1,8 @@
+import { REACTOR_SIZE } from './layout'
+
 // Arc reactor frames for the boot animation, drawn on a canvas and sent to an
 // image container. The glasses convert to 4-bit greyscale; black is transparent.
 
-export const REACTOR_SIZE = 144 // image containers max out at 288x144
 export const REACTOR_FRAMES = 6
 
 const TAU = Math.PI * 2

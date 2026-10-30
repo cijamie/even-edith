@@ -233,3 +233,119 @@ li[data-state='fail'] .verdict {
   color: var(--dim);
   overflow-wrap: anywhere;
 }
+
+/* Mirror: a 576x288 copy of the glasses display, scaled to the card. */
+.mirror {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 2 / 1;
+  overflow: hidden;
+  background: #000;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+.screen {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 576px;
+  height: 288px;
+  transform-origin: 0 0;
+}
+
+.cell {
+  position: absolute;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.cell.text {
+  color: var(--accent);
+  font: 20px/27px -apple-system, system-ui, sans-serif;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* Greyscale images tinted HUD green. */
+img.cell {
+  filter: sepia(1) saturate(6) hue-rotate(65deg) brightness(1.1);
+}
+
+.remote {
+  margin-top: 12px;
+  display: grid;
+  gap: 10px;
+}
+
+.talk {
+  padding: 18px;
+  font-size: 17px;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.pad {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.chip {
+  padding: 8px 12px;
+  border-radius: 999px;
+  font-size: 13px;
+}
+
+.exit {
+  justify-self: start;
+  color: var(--bad);
+  border-color: transparent;
+  padding-left: 0;
+}
+
+textarea {
+  width: 100%;
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--bg);
+  color: var(--text);
+  font: 15px/1.4 -apple-system, system-ui, sans-serif;
+  resize: vertical;
+}
+
+.facts {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.facts li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0;
+  border-top: 1px solid var(--line);
+  font-size: 15px;
+}
+
+.facts button {
+  padding: 6px 10px;
+  font-size: 13px;
+}
+
+.credit {
+  font-size: 12px;
+  color: var(--dim);
+  text-align: center;
+}

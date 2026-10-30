@@ -13,6 +13,12 @@
         <p id="status" class="status">Connecting to glasses…</p>
       </header>
 
+      <section class="card" aria-labelledby="mirror-title">
+        <h2 id="mirror-title">Glasses</h2>
+        <p class="hint">A live copy of the display. Use the controls to drive the glasses while someone else wears them.</p>
+        <div id="mirror"></div>
+      </section>
+
       <section class="card" aria-labelledby="keys-title">
         <h2 id="keys-title">API keys</h2>
         <p class="hint">
@@ -24,8 +30,19 @@
 
       <section class="card" aria-labelledby="prefs-title">
         <h2 id="prefs-title">Preferences</h2>
-        <p class="hint">Used for dashboard weather and when you ask about weather without naming a place.</p>
+        <p class="hint">Home city is used for weather and as the map fallback when location is off.</p>
         <div id="prefs"></div>
+      </section>
+
+      <section class="card" aria-labelledby="tp-title">
+        <h2 id="tp-title">Teleprompter</h2>
+        <p class="hint">Say "EDITH, open teleprompter" and swipe through it on the glasses.</p>
+        <div id="teleprompter"></div>
+      </section>
+
+      <section class="card" aria-labelledby="memory-title">
+        <h2 id="memory-title">Memory</h2>
+        <div id="memory"></div>
       </section>
 
       <section class="card" aria-labelledby="diag-title">
@@ -36,6 +53,8 @@
         </p>
         <div id="diagnostics"></div>
       </section>
+
+      <p class="credit">Map tiles © Esri, HERE, Garmin, © OpenStreetMap contributors. Places by Photon. Weather by Open-Meteo.</p>
     </main>
     <script type="module" src="./src/main.ts"></script>
   </body>

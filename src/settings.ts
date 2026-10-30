@@ -44,4 +44,30 @@ export class Settings {
   setHomeCity(city: string): Promise<void> {
     return this.store.set(HOME_CITY, city)
   }
+
+  /** "HH:MM" for the daily briefing, or '' for off. */
+  briefingTime(): Promise<string> {
+    return this.store.get('edith.briefingTime')
+  }
+
+  setBriefingTime(time: string): Promise<void> {
+    return this.store.set('edith.briefingTime', time)
+  }
+
+  teleprompter(): Promise<string> {
+    return this.store.get('edith.teleprompter')
+  }
+
+  setTeleprompter(script: string): Promise<void> {
+    return this.store.set('edith.teleprompter', script)
+  }
+
+  /** Free-form state the assistant keeps between launches (e.g. last briefing date). */
+  getState(key: string): Promise<string> {
+    return this.store.get(`edith.state.${key}`)
+  }
+
+  setState(key: string, value: string): Promise<void> {
+    return this.store.set(`edith.state.${key}`, value)
+  }
 }

@@ -11,7 +11,7 @@ type Content = { role: 'user' | 'model'; parts: Part[] }
 
 export type Reply = { text: string; actions: ToolContext['actions'] }
 
-function systemPrompt() {
+function systemPrompt(memory: string) {
   const now = new Date()
   return [
     'You are E.D.I.T.H. ("Even Dead, I\'m The Hero"), a Stark Industries tactical AI:',
@@ -21,14 +21,18 @@ function systemPrompt() {
     'Keep it to one to three short sentences, under 60 words, unless asked for more detail.',
     'Be accurate first, witty second. Answer the question before any quip.',
     'If something needs live data you have no tool for, say so briefly.',
-    'Use your tools for timers, reminders, calendar events, notes, weather, currency and the dashboard.',
+    'Use your tools for timers, reminders, calendar events, notes, weather, currency, memory, lookups and the HUD views',
+    '(dashboard, map, radar, captions, translation, meeting recording, teleprompter, briefing, protocols).',
+    'Use web_lookup rather than guessing about facts you are unsure of; say you cannot see live news if asked.',
+    'When the user tells you something worth keeping about themselves or asks you to remember something, call remember.',
     'Never say you have set, saved, added or deleted something unless you called the tool and it succeeded.',
     'Write times and numbers as digits, e.g. 18:00, 3:30pm, £37.46.',
     'Work out exact local times yourself from relative phrases like "in 20 minutes" or "Tuesday at 3".',
     'The calendar is your own, kept on the phone; you cannot see Google or iCloud calendars.',
     `It is ${now.toLocaleString('en-GB', { dateStyle: 'full', timeStyle: 'short' })}` +
       ` (local ISO ${localIso(now.getTime())}, ${Intl.DateTimeFormat().resolvedOptions().timeZone}).`,
-  ].join(' ')
+    memory,
+  ].filter(Boolean).join(' ')
 }
 
 /** Holds a short conversation so follow-ups ("and tomorrow?") make sense. */
@@ -48,7 +52,7 @@ export class Brain {
     const key = await this.getKey()
     if (!key) throw new ApiError('key', 'no Gemini key')
 
-    const ctx: ToolContext = { ...this.context, actions: new Set() }
+    const ctx: ToolContext = { ...this.context, actions: [] }
     const turn: Content[] = [{ role: 'user', parts: [{ text: question }] }]
     // Tool calls loop: model asks for a function, we run it and send the result back.
     for (let step = 0; step < 4; step++) {
@@ -73,13 +77,21 @@ export class Brain {
     throw new ApiError('http', 'too many tool calls')
   }
 
+  /** One-off text task with its own instructions: no tools, no history (e.g. meeting summaries). */
+  async complete(instructions: string, input: string): Promise<string> {
+    const key = await this.getKey()
+    if (!key) throw new ApiError('key', 'no Gemini key')
+    const content = await this.generate(key, [{ role: 'user', parts: [{ text: input }] }], instructions)
+    return clean(content.parts.map((p) => p.text ?? '').join(''))
+  }
+
   private remember(question: string, answer: string) {
     // Text-only history keeps requests small and avoids replaying stale tool data.
     this.history.push({ role: 'user', parts: [{ text: question }] }, { role: 'model', parts: [{ text: answer }] })
     this.history = this.history.slice(-8)
   }
 
-  private async generate(key: string, contents: Content[]): Promise<Content> {
+  private async generate(key: string, contents: Content[], system?: string): Promise<Content> {
     let lastError: unknown
     for (const model of MODELS) {
       try {
@@ -89,9 +101,9 @@ export class Brain {
             method: 'POST',
             headers: { 'x-goog-api-key': key, 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              systemInstruction: { parts: [{ text: systemPrompt() }] },
+              systemInstruction: { parts: [{ text: system ?? systemPrompt(this.context.memory.promptBlock()) }] },
               contents,
-              tools: [{ functionDeclarations: declarations }],
+              ...(system ? {} : { tools: [{ functionDeclarations: declarations }] }),
               generationConfig: { maxOutputTokens: 1024 },
             }),
           },

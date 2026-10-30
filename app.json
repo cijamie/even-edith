@@ -2,24 +2,33 @@
   "package_id": "com.cijamie.evenjarvis",
   "edition": "202601",
   "name": "Even EDITH",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "min_sdk_version": "0.0.16",
   "entrypoint": "index.html",
   "permissions": [
     {
       "name": "network",
-      "desc": "Sends your voice to Groq for transcription, your question to Google Gemini for an answer, fetches weather and place names from Open-Meteo, and exchange rates from open.er-api.com.",
+      "desc": "Voice to Groq, questions to Google Gemini, weather from Open-Meteo, rates from open.er-api.com, maps from Esri/OpenStreetMap, places from Photon and Nominatim, facts from Wikipedia and DuckDuckGo.",
       "whitelist": [
         "https://api.groq.com",
         "https://generativelanguage.googleapis.com",
         "https://api.open-meteo.com",
         "https://geocoding-api.open-meteo.com",
-        "https://open.er-api.com"
+        "https://open.er-api.com",
+        "https://services.arcgisonline.com",
+        "https://nominatim.openstreetmap.org",
+        "https://photon.komoot.io",
+        "https://en.wikipedia.org",
+        "https://api.duckduckgo.com"
       ]
     },
     {
       "name": "g2-microphone",
-      "desc": "Records your voice from the glasses microphones while you hold the ring or touchpad to talk."
+      "desc": "Records from the glasses microphones while you talk to EDITH, and for live captions and meeting notes."
+    },
+    {
+      "name": "location",
+      "desc": "Shows where you are on the map, finds nearby places for radar, and gives local weather."
     }
   ],
   "supported_languages": [

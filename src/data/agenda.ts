@@ -2,7 +2,7 @@ import type { Store } from '../store'
 
 export type Timer = { id: string; label: string; endsAt: number; seconds: number }
 export type Reminder = { id: string; text: string; at: number }
-export type CalEvent = { id: string; title: string; start: number; end?: number }
+export type CalEvent = { id: string; title: string; start: number; end?: number; nudged?: boolean }
 export type Note = { id: string; text: string; createdAt: number }
 
 type Data = { timers: Timer[]; reminders: Reminder[]; events: CalEvent[]; notes: Note[] }
@@ -89,6 +89,16 @@ export class Agenda {
     const removed = before - this.data[kind].length
     if (removed) await this.save()
     return removed
+  }
+
+  /** Events starting within `leadMs` that haven't had their heads-up yet; marks them as nudged. */
+  async takeUpcoming(leadMs: number, now = Date.now()) {
+    const soon = this.data.events.filter((e) => !e.nudged && e.start > now && e.start - now <= leadMs)
+    if (soon.length) {
+      soon.forEach((e) => (e.nudged = true))
+      await this.save()
+    }
+    return soon
   }
 
   /** Timers and reminders whose time has come; removes them as it returns them. */

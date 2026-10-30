@@ -1,5 +1,6 @@
 import type { Settings } from '../settings'
 import { toWav } from '../voice/recorder'
+import type { Fix } from '../geo/location'
 
 export type Result = {
   ok: boolean
@@ -169,7 +170,64 @@ export const CHECKS: Check[] = [
       return { ...r, detail: `1 USD = ${r.body?.rates?.GBP} GBP` }
     },
   },
+  {
+    id: 'map-tiles',
+    label: 'Map tiles (Esri)',
+    async run() {
+      try {
+        const res = await fetch('https://services.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/12/1362/2046', { signal: AbortSignal.timeout(10000) })
+        // Decoding proves the pixels are readable (CORS), which the map needs.
+        await createImageBitmap(await res.blob())
+        return { ok: res.ok, verdict: res.ok ? 'OK' : `HTTP ${res.status}`, detail: 'Tile decoded.' }
+      } catch {
+        return { ok: false, verdict: 'BLOCKED', detail: 'Tile not readable: CORS, whitelist or network.' }
+      }
+    },
+  },
+  {
+    id: 'nominatim',
+    label: 'Street names (Nominatim)',
+    async run() {
+      const r = await call('https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=51.5007&lon=-0.1246&zoom=17')
+      return r.ok ? { ...r, detail: r.body?.address?.road ?? 'Found.' } : r
+    },
+  },
+  {
+    id: 'photon',
+    label: 'Nearby places (Photon)',
+    async run() {
+      const r = await call('https://photon.komoot.io/reverse?limit=1&radius=1&lat=51.5&lon=-0.12&osm_tag=amenity:cafe')
+      return r.ok ? { ...r, detail: `${r.body?.features?.length ?? 0} result.` } : r
+    },
+  },
+  {
+    id: 'web',
+    label: 'Lookups (Wikipedia, DuckDuckGo)',
+    async run() {
+      const [w, d] = await Promise.all([
+        call('https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=Tony%20Stark&format=json&origin=*&srlimit=1'),
+        call('https://api.duckduckgo.com/?q=Tony+Stark&format=json&no_html=1'),
+      ])
+      if (!w.ok) return { ...w, detail: `Wikipedia: ${w.detail}` }
+      if (!d.ok) return { ...d, detail: `DuckDuckGo: ${d.detail}` }
+      return { ok: true, verdict: 'OK', detail: 'Both answered.' }
+    },
+  },
+  {
+    id: 'location',
+    label: 'Phone location',
+    async run() {
+      const fix = await locate()
+      return fix
+        ? { ok: true, verdict: 'OK', detail: `${fix.source === 'phone' ? 'Phone GPS' : fix.source === 'browser' ? 'Browser' : 'Home city'}${fix.accuracy ? ` ±${Math.round(fix.accuracy)}m` : ''}` }
+        : { ok: false, verdict: 'NO FIX', detail: 'Allow location for the Even app, or set a home city.' }
+    },
+  },
 ]
+
+let locate: () => Promise<Fix | null> = async () => null
+/** The location check needs the app's Locator; main wires it in. */
+export const setLocator = (fn: () => Promise<Fix | null>) => (locate = fn)
 
 export async function runCheck(check: Check, settings: Settings): Promise<Result> {
   const t0 = performance.now()

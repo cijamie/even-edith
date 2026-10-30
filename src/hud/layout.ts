@@ -1,24 +1,12 @@
-import {
-  CreateStartUpPageContainer,
-  ImageContainerProperty,
-  RebuildPageContainer,
-  TextContainerProperty,
-  type EvenAppBridge,
-} from '@evenrealities/even_hub_sdk'
-import { REACTOR_SIZE } from './reactor'
+import { ImageContainerProperty, TextContainerProperty } from '@evenrealities/even_hub_sdk'
 
-// Canvas is 576x288. Text brightness is 0-4 (SDK limit), so "dim chrome"
-// uses CHROME and content uses BRIGHT.
-export const CHROME = 2
-export const BRIGHT = 4
-
+// Canvas is 576x288. Text brightness is 0-4 (SDK limit).
 // Measured in the simulator: ~27px per line, '─' ~20px, ' ' ~5px.
 export const LINE_HEIGHT = 27
-export const BODY_WIDTH = 544 // inner width after padding
+export const BODY_WIDTH = 544 // inner width of the full-width body
 export const BODY_LINES = 7
 
 // Corner glyphs. Single-line because stacked '│' leaves gaps between lines.
-// Swap here if hardware renders them differently.
 export const GLYPHS = {
   tl: '╭──',
   tr: '──╮',
@@ -35,19 +23,16 @@ export const ID = {
   body: 6,
   footer: 7,
   reactor: 8,
+  mapTop: 9,
+  mapBottom: 10,
 } as const
 
-export const REACTOR = { name: 'reactor', x: 216, y: 38 }
-
-export const NAMES: Record<number, string> = {
-  [ID.tl]: 'tl',
-  [ID.tr]: 'tr',
-  [ID.bl]: 'bl',
-  [ID.br]: 'br',
-  [ID.header]: 'header',
-  [ID.body]: 'body',
-  [ID.footer]: 'footer',
-}
+/** chrome = frame and status text (dimmed by night protocol, hidden by stealth); body = content. */
+export type Role = 'chrome' | 'body'
+export type TextSpec = { kind: 'text'; id: number; name: string; x: number; y: number; w: number; h: number; role: Role; capture?: boolean; padding?: number }
+export type ImageSpec = { kind: 'image'; id: number; name: string; x: number; y: number; w: number; h: number }
+export type Spec = TextSpec | ImageSpec
+export type LayoutName = 'hud' | 'boot' | 'map'
 
 // Corners need slack beyond the ~51px glyph run, or the text wraps and the
 // firmware draws a scroll indicator. Text is left-aligned (leading spaces
@@ -57,81 +42,85 @@ const CORNER_W_RIGHT = 64
 const ROW_H = 32
 const BOTTOM_Y = 288 - ROW_H
 
-function text(
-  id: number,
-  x: number,
-  y: number,
-  width: number,
-  height: number,
-  textColor: number,
-  extra: Partial<TextContainerProperty> = {},
-) {
-  return new TextContainerProperty({
-    containerID: id,
-    containerName: NAMES[id],
-    xPosition: x,
-    yPosition: y,
-    width,
-    height,
-    textColor,
-    content: ' ',
-    borderWidth: 0,
-    paddingLength: 0,
-    isEventCapture: 0,
-    ...extra,
-  })
+const text = (id: number, name: string, x: number, y: number, w: number, h: number, role: Role, extra: Partial<TextSpec> = {}): TextSpec => ({
+  kind: 'text', id, name, x, y, w, h, role, ...extra,
+})
+
+const corners = [
+  text(ID.tl, 'tl', 0, 0, CORNER_W, ROW_H, 'chrome'),
+  text(ID.tr, 'tr', 576 - CORNER_W_RIGHT, 0, CORNER_W_RIGHT, ROW_H, 'chrome'),
+  text(ID.bl, 'bl', 0, BOTTOM_Y, CORNER_W, ROW_H, 'chrome'),
+  text(ID.br, 'br', 576 - CORNER_W_RIGHT, BOTTOM_Y, CORNER_W_RIGHT, ROW_H, 'chrome'),
+]
+
+const hud: Spec[] = [
+  ...corners,
+  text(ID.header, 'header', CORNER_W + 8, 0, 576 - 2 * (CORNER_W + 8), ROW_H, 'chrome'),
+  text(ID.body, 'body', 12, ROW_H + 4, 552, BOTTOM_Y - ROW_H - 8, 'body', { capture: true, padding: 4 }),
+  text(ID.footer, 'footer', CORNER_W + 8, BOTTOM_Y, 576 - 2 * (CORNER_W + 8), ROW_H, 'chrome'),
+]
+
+// Map size: two stacked 288x144 images (the per-image maximum) make a 288x288 square.
+export const MAP_SIZE = 288
+export const REACTOR_SIZE = 144
+export const REACTOR_POS = { x: 216, y: 38 }
+const SIDE_X = MAP_SIZE + 10
+export const SIDE_WIDTH = 576 - SIDE_X - 8
+
+export const LAYOUTS: Record<LayoutName, Spec[]> = {
+  hud,
+  // Boot adds the arc reactor canvas. It's dropped afterwards: even an
+  // all-black image hides the text behind it.
+  boot: [...hud, { kind: 'image', id: ID.reactor, name: 'reactor', x: REACTOR_POS.x, y: REACTOR_POS.y, w: REACTOR_SIZE, h: REACTOR_SIZE }],
+  // Map and radar: square image on the left, info panel on the right.
+  map: [
+    { kind: 'image', id: ID.mapTop, name: 'mapTop', x: 0, y: 0, w: MAP_SIZE, h: 144 },
+    { kind: 'image', id: ID.mapBottom, name: 'mapBottom', x: 0, y: 144, w: MAP_SIZE, h: 144 },
+    corners[1],
+    corners[3],
+    text(ID.header, 'header', SIDE_X, 0, 576 - SIDE_X - CORNER_W_RIGHT, ROW_H, 'chrome'),
+    text(ID.body, 'body', SIDE_X, ROW_H + 4, SIDE_WIDTH, BOTTOM_Y - ROW_H - 8, 'body', { capture: true, padding: 2 }),
+    text(ID.footer, 'footer', SIDE_X, BOTTOM_Y, 576 - SIDE_X - CORNER_W_RIGHT, ROW_H, 'chrome'),
+  ],
 }
 
-/** Initial text per container, for rebuilding the page without losing what's on screen. */
-export type HudContent = Partial<Record<number, string>>
+export const specOf = (layout: LayoutName, id: number) => LAYOUTS[layout].find((s) => s.id === id)
 
-function hudPage(withReactor: boolean, content: HudContent = {}) {
-  const c = (id: number) => ({ content: content[id] || ' ' })
+/** Builds the SDK page description for a layout. `content`/`color` give each text container's initial state. */
+export function buildPage(layout: LayoutName, content: (id: number) => string, color: (spec: TextSpec) => number) {
+  const specs = LAYOUTS[layout]
   return {
-    containerTotalNum: withReactor ? 8 : 7,
-    // Boot-animation canvas, centred over the body. Only present during boot:
-    // even an all-black image hides the text behind it.
-    imageObject: withReactor
-      ? [
-          new ImageContainerProperty({
-            containerID: ID.reactor,
-            containerName: REACTOR.name,
-            xPosition: REACTOR.x,
-            yPosition: REACTOR.y,
-            width: REACTOR_SIZE,
-            height: REACTOR_SIZE,
+    containerTotalNum: specs.length,
+    textObject: specs
+      .filter((s): s is TextSpec => s.kind === 'text')
+      .map(
+        (s) =>
+          new TextContainerProperty({
+            containerID: s.id,
+            containerName: s.name,
+            xPosition: s.x,
+            yPosition: s.y,
+            width: s.w,
+            height: s.h,
+            content: content(s.id) || ' ',
+            textColor: color(s),
+            borderWidth: 0,
+            paddingLength: s.padding ?? 0,
+            isEventCapture: s.capture ? 1 : 0,
           }),
-        ]
-      : [],
-    textObject: [
-      text(ID.tl, 0, 0, CORNER_W, ROW_H, CHROME, c(ID.tl)),
-      text(ID.tr, 576 - CORNER_W_RIGHT, 0, CORNER_W_RIGHT, ROW_H, CHROME, c(ID.tr)),
-      text(ID.bl, 0, BOTTOM_Y, CORNER_W, ROW_H, CHROME, c(ID.bl)),
-      text(ID.br, 576 - CORNER_W_RIGHT, BOTTOM_Y, CORNER_W_RIGHT, ROW_H, CHROME, c(ID.br)),
-      text(ID.header, CORNER_W + 8, 0, 576 - 2 * (CORNER_W + 8), ROW_H, CHROME, c(ID.header)),
-      text(ID.body, 12, ROW_H + 4, 552, BOTTOM_Y - ROW_H - 8, BRIGHT, {
-        paddingLength: 4,
-        isEventCapture: 1,
-        ...c(ID.body),
-      }),
-      text(ID.footer, CORNER_W + 8, BOTTOM_Y, 576 - 2 * (CORNER_W + 8), ROW_H, CHROME, c(ID.footer)),
-    ],
-  }
-}
-
-/** Drops the reactor image once boot is done, keeping the given text on screen. */
-export async function removeReactor(bridge: EvenAppBridge, content: HudContent) {
-  return bridge.rebuildPageContainer(new RebuildPageContainer(hudPage(false, content)))
-}
-
-/** Creates the HUD page (with the boot reactor) and every container blank; the boot sequence fills it. */
-export async function createHud(bridge: EvenAppBridge) {
-  const page = hudPage(true)
-  const result = await bridge.createStartUpPageContainer(new CreateStartUpPageContainer(page))
-  if (result === 0) return
-  // The startup page can only be created once per launch. After a WebView
-  // reload (or a dev hot-reload) it already exists, so rebuild it instead.
-  if (!(await bridge.rebuildPageContainer(new RebuildPageContainer(page)))) {
-    throw new Error(`createStartUpPageContainer failed: ${result}, rebuild failed too`)
+      ),
+    imageObject: specs
+      .filter((s): s is ImageSpec => s.kind === 'image')
+      .map(
+        (s) =>
+          new ImageContainerProperty({
+            containerID: s.id,
+            containerName: s.name,
+            xPosition: s.x,
+            yPosition: s.y,
+            width: s.w,
+            height: s.h,
+          }),
+      ),
   }
 }
