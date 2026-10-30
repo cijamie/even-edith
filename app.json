@@ -8,11 +8,12 @@
   "permissions": [
     {
       "name": "network",
-      "desc": "Sends your voice to Groq for transcription, your question to Google Gemini for an answer, and fetches weather from Open-Meteo.",
+      "desc": "Sends your voice to Groq for transcription, your question to Google Gemini for an answer, and fetches weather and place names from Open-Meteo.",
       "whitelist": [
         "https://api.groq.com",
         "https://generativelanguage.googleapis.com",
-        "https://api.open-meteo.com"
+        "https://api.open-meteo.com",
+        "https://geocoding-api.open-meteo.com"
       ]
     },
     {

@@ -23,5 +23,5 @@ foreach ($s in $Steps) {
   }
 }
 (Invoke-RestMethod "$Api/api/console").entries |
-  Where-Object { $_.level -in 'error', 'warn' -or $_.message -match 'EvenHub event' } |
+  Where-Object { $_.message -notmatch 'audioPcm' -and ($_.level -in 'error', 'warn' -or $_.message -match 'EvenHub event|^\[voice\]|^\[boot\]') } |
   Select-Object -Last 12 | ForEach-Object { "[$($_.level)] $($_.message)" }
