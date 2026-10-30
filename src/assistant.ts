@@ -31,6 +31,7 @@ import { GuideMode } from './modes/guide'
 import { ListMode } from './modes/list'
 import { ActivityMode } from './modes/activity'
 import { bar, SuitMode } from './modes/suit'
+import { IronManMode } from './modes/ironman'
 import { clock, countdown } from './util/time'
 
 type State = 'idle' | 'listening' | 'thinking'
@@ -56,7 +57,7 @@ const FAST: [RegExp, Action | 'close'][] = [
   [/^(?:stop|turn off|disable) hands ?free\b|^stop listening\b/, { type: 'handsfree', on: false }],
   [/\bhouse party protocol\b/, { type: 'easter', id: 'house-party' }],
   [/\bclean slate protocol\b/, { type: 'easter', id: 'clean-slate' }],
-  [/^i am iron ?man\b/, { type: 'easter', id: 'iron-man' }],
+  [/^i(?: am| m)? iron ?man\b/, { type: 'easter', id: 'iron-man' }],
   [/\bself destruct\b/, { type: 'easter', id: 'self-destruct' }],
   [/^(?:are you there|you there|you up|wake up)\b/, { type: 'easter', id: 'there' }],
   [/^(?:close|hide|dismiss|exit)\b|^stop$/, 'close'],
@@ -425,8 +426,7 @@ export class Assistant {
         void this.display.set(ID.header, this.banner)
         break
       case 'iron-man':
-        await this.say("And I'm a pair of glasses. Let's not get carried away.")
-        break
+        return this.enterMode(new IronManMode(this.host))
       case 'self-destruct':
         void this.display.set(ID.header, '● SELF DESTRUCT ●')
         for (const n of ['3', '2', '1']) {
