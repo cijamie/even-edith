@@ -2,12 +2,12 @@
 
 **E.D.I.T.H.** (Even Dead, I'm The Hero): a Stark-style AI assistant for Even Realities G2 glasses + R1 ring, built with the Even Hub SDK.
 
-Hold the ring and talk, or turn on hands-free and say "Hey EDITH". EDITH answers on the HUD.
+Hold the ring and talk, or turn on hands-free and say "EDITH, …". EDITH answers on the HUD.
 
 ## What she does
 
 - **Ask anything**: Gemini answers in a dry, terse voice, with **Google Search** for news, prices, stock quotes, flight status and anything current. Falls back to Wikipedia/DuckDuckGo past the free search quota.
-- **Hands-free**: "Hey EDITH, what's the weather?" works in one breath, or say "Hey EDITH" and then your question. Opt in on the phone; uses more battery and Groq quota (see below).
+- **Hands-free**: "EDITH, what's the weather?" works in one breath, or say "EDITH" (or "OK EDITH") and then your question. Don't say "Hey EDITH": the glasses' own "Hey Even" wake word catches the "Hey E…" first and opens Even AI. Opt in on the phone; uses more battery and Groq quota (see below).
 - **Walking navigation**: "take me to the British Museum" / "navigate to the nearest pharmacy": route map, turn arrow, distance and street, automatic rerouting.
 - **Live captions / translation** with **rewind** (swipe up) and **You/Them labels** when the Even app can tell who's talking. Ask "what did they just say?" afterwards.
 - **Meeting mode**: records, transcribes with speaker labels, and saves a summary with action items to notes. Share any note from the phone.
@@ -29,7 +29,7 @@ Hold the ring and talk, or turn on hands-free and say "Hey EDITH". EDITH answers
 ### About hands-free
 
 The glasses have no on-device wake word engine, so hands-free keeps the mic open while EDITH is open on the glasses,
-cuts out each phrase you say, and sends it to Groq Whisper to check whether it starts with "Hey EDITH" (or FRIDAY/JARVIS).
+cuts out each phrase you say, and sends it to Groq Whisper to check whether it starts with "EDITH" (or FRIDAY/JARVIS).
 Speech the Even app tags as someone else is skipped. Each check is one Groq request, so in a long conversation it can
 use a good part of the free daily quota; EDITH pauses hands-free at 95% and says so. It doesn't work while the app is
 closed or in the background.

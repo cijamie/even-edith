@@ -47,10 +47,12 @@ export async function mountPrefs(root: HTMLElement, settings: Settings, onChange
     </div>
     <div class="key">
       <div class="key-head">
-        <label for="handsfree">Hands-free ("Hey EDITH")</label>
+        <label for="handsfree">Hands-free ("EDITH, …")</label>
         <input id="handsfree" type="checkbox" class="toggle" />
       </div>
       <p class="hint">
+        Start with her name: "EDITH, what's the weather?" or "OK EDITH". Don't say "Hey EDITH":
+        "Hey E…" wakes the glasses' own Even AI assistant instead.
         Keeps the glasses mic on while EDITH is open and listens for her name, so it uses more battery.
         Each phrase you say is sent to Groq to check for the name (speech the app tags as someone else is skipped),
         which counts against Groq's free daily quota. Works only while the app is open on the glasses.

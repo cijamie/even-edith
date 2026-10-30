@@ -40,7 +40,8 @@ const HUD_CHROME = { [ID.tl]: GLYPHS.tl, [ID.tr]: GLYPHS.tr, [ID.bl]: GLYPHS.bl,
 const NUDGE_LEAD_MS = 10 * 60_000
 // Wake checks share Groq's free requests-per-minute with everything else; leave room.
 const WAKE_GAP_MS = Math.ceil(60_000 / (GROQ_FREE.requestsPerMinute - 6))
-const WAKE_PROMPT = 'Hey EDITH.'
+// The name alone, not "Hey EDITH": the glasses' own "Hey Even" wake word fires on "Hey E...".
+const WAKE_PROMPT = 'EDITH.'
 
 // Handled locally so these open instantly, without a round trip to Gemini.
 const FAST: [RegExp, Action | 'close'][] = [
@@ -75,7 +76,7 @@ export type Deps = {
  * Ring-to-talk loop: hold to record, release to transcribe (Groq Whisper),
  * ask (Gemini), then type the answer out with swipe paging. A single press also
  * starts/stops listening, as a fallback for long press. With hands-free on,
- * "Hey EDITH" does the same without touching the ring.
+ * saying "EDITH" (or "OK EDITH") does the same without touching the ring.
  * Also owns the dashboard, full-screen modes, protocols, alerts and briefings.
  */
 export class Assistant {
@@ -184,7 +185,7 @@ export class Assistant {
   }
 
   get idleHint() {
-    return this.handsFree ? `"HEY ${this.persona.toUpperCase()}" · HOLD` : 'HOLD · TALK'
+    return this.handsFree ? `SAY "${this.persona.toUpperCase()}" · HOLD` : 'HOLD · TALK'
   }
 
   get activeMode() {
@@ -381,7 +382,7 @@ export class Assistant {
     void this.display.set(ID.footer, this.idleHint)
     await this.say(
       on
-        ? `Hands-free on. Say "Hey ${this.persona === 'edith' ? 'EDITH' : this.persona.charAt(0).toUpperCase() + this.persona.slice(1)}" any time. It uses more battery.`
+        ? `Hands-free on. Start with my name, like "${this.persona === 'edith' ? 'EDITH' : this.persona.charAt(0).toUpperCase() + this.persona.slice(1)}, what's the time?" Skip the "hey": that wakes Even's own assistant. It uses more battery.`
         : 'Hands-free off. Hold the ring to talk.',
     )
   }
@@ -596,7 +597,7 @@ export class Assistant {
       console.log(`[wake] "${said}" →`, command === null ? 'no wake' : `"${command}"`)
       if (command === null || this.state !== 'idle') return
       if (command.split(/\s+/).filter(Boolean).length >= 2) {
-        // "Hey EDITH, what's the weather" in one breath: answer it directly.
+        // "EDITH, what's the weather" in one breath: answer it directly.
         await this.handleText(command)
       } else {
         if (this.mode) await this.closeMode()

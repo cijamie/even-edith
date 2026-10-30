@@ -80,7 +80,7 @@ export class Settings {
     return this.store.set('edith.persona', id)
   }
 
-  /** "Hey EDITH" wake word: '1' on, '' off. */
+  /** "EDITH, …" wake word: '1' on, '' off. */
   async handsFree(): Promise<boolean> {
     return (await this.store.get('edith.handsFree')) === '1'
   }

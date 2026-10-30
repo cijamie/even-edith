@@ -11,7 +11,8 @@ const MAX_SECONDS = 9
 export type Utterance = { wav: Blob; seconds: number }
 
 /**
- * Always-on listening for "Hey EDITH". There's no on-device keyword spotter,
+ * Always-on listening for "EDITH, …" ("Hey EDITH" also matches, but the glasses'
+ * own "Hey Even" wake word usually grabs that first). There's no on-device keyword spotter,
  * so this does the cheap part locally: it waits for a burst of speech, cuts it
  * at the pause, and hands it over for transcription. Bursts the Even app marks
  * as someone else talking are dropped, so only the wearer's speech is checked.

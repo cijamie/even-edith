@@ -290,7 +290,7 @@ const tools: Record<string, Tool> = {
 
   set_hands_free: view(
     'set_hands_free',
-    'Turn the "Hey EDITH" wake word on or off.',
+    'Turn the hands-free wake word (saying "EDITH") on or off.',
     ({ on }) => ({ type: 'handsfree', on: !!on }),
     obj({ on: { type: 'boolean' } }, ['on']),
   ),
