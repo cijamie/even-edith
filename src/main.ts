@@ -3,6 +3,7 @@ import { waitForEvenAppBridge, OsEventTypeList, type EvenAppBridge } from '@even
 import { runProbe } from './probe'
 import { Settings } from './settings'
 import { mountKeys } from './phone/keys-ui'
+import { mountDiagnostics } from './phone/diagnostics-ui'
 import { Display } from './hud/display'
 import { createHud, ID, NAMES } from './hud/layout'
 import { boot } from './hud/boot'
@@ -17,6 +18,7 @@ const settings = new Settings(bridge)
 // The phone UI works even when no glasses are connected (desktop browser, Pages).
 let onKeysChanged = () => {}
 await mountKeys(document.getElementById('keys')!, settings, () => onKeysChanged())
+mountDiagnostics(document.getElementById('diagnostics')!, settings)
 
 if (new URLSearchParams(location.search).has('probe')) {
   await runProbe(bridge)

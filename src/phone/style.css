@@ -167,3 +167,69 @@ button:disabled {
 .msg.ok {
   color: var(--accent);
 }
+
+.checks {
+  list-style: none;
+  margin: 0 0 8px;
+  padding: 0;
+}
+
+.checks li {
+  display: flex;
+  gap: 10px;
+  padding: 10px 0;
+  border-top: 1px solid var(--line);
+}
+
+.dot {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  margin-top: 6px;
+  border-radius: 50%;
+  background: var(--line);
+}
+
+li[data-state='running'] .dot {
+  background: var(--warn);
+}
+
+li[data-state='pass'] .dot {
+  background: var(--accent);
+}
+
+li[data-state='fail'] .dot {
+  background: var(--bad);
+}
+
+.check-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.check-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 15px;
+}
+
+.verdict {
+  font: 12px var(--mono);
+  color: var(--dim);
+  white-space: nowrap;
+}
+
+li[data-state='pass'] .verdict {
+  color: var(--accent);
+}
+
+li[data-state='fail'] .verdict {
+  color: var(--bad);
+}
+
+.check-detail {
+  font-size: 13px;
+  color: var(--dim);
+  overflow-wrap: anywhere;
+}
