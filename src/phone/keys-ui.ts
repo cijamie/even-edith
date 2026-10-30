@@ -11,7 +11,7 @@ const FIELDS: { name: KeyName; label: string; where: string; format: string }[] 
     name: 'gemini',
     label: 'Gemini (the brain)',
     where: 'aistudio.google.com/apikey',
-    format: 'Gemini keys start with AIza and are 39 characters',
+    format: 'Gemini keys start with AIza or AQ.',
   },
 ]
 

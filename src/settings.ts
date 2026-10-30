@@ -9,7 +9,8 @@ const STORAGE_KEY: Record<KeyName, string> = {
 
 // Format checks only; whether a key actually works is tested in the CORS screen.
 const PATTERN: Record<KeyName, RegExp> = {
-  gemini: /^AIza[0-9A-Za-z_-]{35}$/,
+  // Classic keys are AIza…; AI Studio now also issues "auth keys" starting AQ.
+  gemini: /^(AIza[0-9A-Za-z_-]{35}|AQ\.[0-9A-Za-z_.-]{20,})$/,
   groq: /^gsk_[0-9A-Za-z]{40,}$/,
 }
 
