@@ -160,6 +160,15 @@ export const CHECKS: Check[] = [
       return { ...r, detail: p ? `Found ${p.name}, ${p.country}.` : 'No results.' }
     },
   },
+  {
+    id: 'currency',
+    label: 'Exchange rates',
+    async run() {
+      const r = await call('https://open.er-api.com/v6/latest/USD')
+      if (!r.ok) return r
+      return { ...r, detail: `1 USD = ${r.body?.rates?.GBP} GBP` }
+    },
+  },
 ]
 
 export async function runCheck(check: Check, settings: Settings): Promise<Result> {

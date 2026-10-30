@@ -1,42 +1,58 @@
 import { OsEventTypeList, type EvenAppBridge, type EvenHubEvent } from '@evenrealities/even_hub_sdk'
 import type { Display } from './hud/display'
 import { ID } from './hud/layout'
-import { typewrite, type Typing } from './hud/typewriter'
+import { sleep, typewrite, type Typing } from './hud/typewriter'
 import { paginate } from './hud/paginate'
 import { Waveform } from './hud/waveform'
+import { Dashboard } from './hud/dashboard'
 import { Recorder } from './voice/recorder'
 import { isNoise, transcribe } from './net/groq'
 import { Brain } from './net/gemini'
 import { ApiError } from './net/http'
+import type { Agenda } from './data/agenda'
 import type { Settings } from './settings'
 
 type State = 'idle' | 'listening' | 'thinking'
+type View = 'answer' | 'dashboard'
 
 const BANNER = 'J.A.R.V.I.S // ONLINE'
 const IDLE_HINT = 'HOLD · TALK'
+
+// Handled locally so the dashboard opens instantly, without a round trip to Gemini.
+const OPEN_DASHBOARD = /^(?:(?:please|can you|could you)\s+)?(?:open|show|bring up|display|pull up)(?: me)?(?: the| my)? dashboard\b/
+const CLOSE_DASHBOARD = /^(?:close|hide|dismiss)(?: the| my)? dashboard\b/
 
 /**
  * Ring-to-talk loop: hold to record, release to transcribe (Groq Whisper),
  * ask (Gemini), then type the answer out with swipe paging.
  * A single press also starts/stops listening, as a fallback for long press.
+ * Also owns the dashboard view and fires timer/reminder alerts.
  */
 export class Assistant {
   private state: State = 'idle'
+  private view: View = 'answer'
   private pages: string[] = []
   private page = 0
   private typing: Typing | null = null
   private waveform = new Waveform()
   private recorder: Recorder
   private brain: Brain
+  private dashboard: Dashboard
   private spinner: ReturnType<typeof setInterval> | undefined
+  private alerts: string[] = []
+  private alerting = false
+  private lastDashboard = ''
 
   constructor(
     private bridge: EvenAppBridge,
     private display: Display,
     private settings: Settings,
+    private agenda: Agenda,
   ) {
     this.recorder = new Recorder(bridge, (level) => void this.display.set(ID.footer, this.waveform.push(level)))
-    this.brain = new Brain(() => settings.get('gemini'))
+    this.brain = new Brain(() => settings.get('gemini'), { agenda, settings })
+    this.dashboard = new Dashboard(agenda, settings)
+    setInterval(() => void this.tick(), 1000)
   }
 
   handle(event: EvenHubEvent) {
@@ -58,6 +74,7 @@ export class Assistant {
       case OsEventTypeList.CLICK_EVENT:
         if (this.typing) this.skipTyping()
         else if (this.state === 'listening') void this.respond()
+        else if (this.view === 'dashboard') void this.closeDashboard()
         else if (this.state === 'idle') void this.listen()
         break
       case OsEventTypeList.SCROLL_BOTTOM_EVENT:
@@ -75,13 +92,78 @@ export class Assistant {
 
   /** Show a message as Jarvis's reply (also used for the boot greeting and errors). */
   async say(text: string) {
+    this.view = 'answer'
     this.pages = paginate(text)
     await this.showPage(0)
+  }
+
+  async openDashboard() {
+    this.view = 'dashboard'
+    void this.display.set(ID.header, 'DASHBOARD')
+    const weather = this.dashboard.refreshWeather()
+    this.pages = paginate(this.dashboard.render())
+    this.lastDashboard = this.pages[0]
+    await this.showPage(0)
+    // Weather arrives after the first draw; tick() redraws with it.
+    await weather
+  }
+
+  private async closeDashboard() {
+    this.view = 'answer'
+    this.pages = []
+    await Promise.all([
+      this.display.set(ID.header, BANNER),
+      this.display.set(ID.body, ' '),
+      this.display.set(ID.footer, IDLE_HINT),
+    ])
+  }
+
+  /** Once a second: fire due alerts, and keep the dashboard's clock and timers live. */
+  private async tick() {
+    const due = await this.agenda.takeDue()
+    for (const t of due.timers) this.alerts.push(`Your ${t.label === 'timer' ? '' : t.label + ' '}timer is done, sir.`)
+    for (const r of due.reminders) this.alerts.push(`Reminder: ${r.text}`)
+    if (this.alerts.length && this.state === 'idle' && !this.typing && !this.alerting) {
+      void this.showAlerts()
+      return
+    }
+    if (this.view === 'dashboard' && this.state === 'idle' && !this.typing) {
+      const pages = paginate(this.dashboard.render())
+      if (pages.length !== this.pages.length) void this.footerFor(this.page)
+      this.pages = pages
+      this.page = Math.min(this.page, pages.length - 1)
+      // Only send when something changed (the clock ticks per minute; timers per second).
+      if (pages[this.page] !== this.lastDashboard) {
+        this.lastDashboard = pages[this.page]
+        void this.display.set(ID.body, this.lastDashboard)
+      }
+      void this.dashboard.refreshWeather()
+    }
+  }
+
+  private async showAlerts() {
+    this.alerting = true
+    const wasDashboard = this.view === 'dashboard'
+    // Blink the header so an alert is noticed even mid-glance.
+    for (let i = 0; i < 3; i++) {
+      await this.display.set(ID.header, '● ALERT ●')
+      await sleep(250)
+      await this.display.set(ID.header, ' ')
+      await sleep(150)
+    }
+    void this.display.set(ID.header, '● ALERT ●')
+    const text = this.alerts.splice(0).join('\n')
+    await this.say(text)
+    void this.display.set(ID.header, BANNER)
+    this.alerting = false
+    // Leave the alert on screen; the dashboard comes back on the next open.
+    if (wasDashboard) this.view = 'answer'
   }
 
   private async listen() {
     this.skipTyping()
     this.state = 'listening'
+    this.view = 'answer'
     this.waveform.reset()
     await Promise.all([
       this.display.set(ID.header, 'LISTENING'),
@@ -93,14 +175,14 @@ export class Assistant {
     } catch (err) {
       console.error(err)
       this.state = 'idle'
-      await this.fail('My microphone is unavailable. Do check the glasses are connected.')
+      await this.finish('My microphone is unavailable. Do check the glasses are connected.')
     }
   }
 
   private async respond() {
     this.state = 'thinking'
     const audio = await this.recorder.stop()
-    console.log(`[voice] ${audio.seconds.toFixed(1)}s, peak ${audio.peak.toFixed(2)}`)
+    console.log(`[voice] ${audio.seconds.toFixed(1)}s, peak ${audio.peak.toFixed(3)}`)
     // Skip the upload for taps and near-silence; Whisper invents words for silence.
     if (audio.seconds < 0.4 || audio.peak < 0.008) return this.finish("I didn't catch that.")
 
@@ -116,12 +198,34 @@ export class Assistant {
     }
     console.log(`[voice] heard: ${question}`)
     if (isNoise(question)) return this.finish("I didn't catch that.")
+    return this.handleText(question)
+  }
+
+  /** Runs a transcribed (or typed) request. Exposed for testing without a mic. */
+  async handleText(question: string) {
+    this.state = 'thinking'
+    const command = normalise(question)
+    if (OPEN_DASHBOARD.test(command)) {
+      this.stopSpin()
+      this.state = 'idle'
+      return this.openDashboard()
+    }
+    if (CLOSE_DASHBOARD.test(command)) {
+      this.stopSpin()
+      this.state = 'idle'
+      return this.closeDashboard()
+    }
 
     void this.display.set(ID.header, `» ${truncate(question, 34)}`)
     this.spin('THINKING')
     try {
-      const answer = await this.brain.ask(question)
-      return this.finish(answer || 'I have nothing useful to add, which is rare.', true)
+      const reply = await this.brain.ask(question)
+      if (reply.actions.has('dashboard')) {
+        this.stopSpin()
+        this.state = 'idle'
+        return this.openDashboard()
+      }
+      return this.finish(reply.text || 'I have nothing useful to add, which is rare.', true)
     } catch (err) {
       console.error(err)
       return this.finish(explain(err, 'Gemini'))
@@ -135,19 +239,15 @@ export class Assistant {
     await this.say(text)
   }
 
-  private async fail(text: string) {
-    this.stopSpin()
-    void this.display.set(ID.header, BANNER)
-    await this.say(text)
+  private footerFor(n: number) {
+    const hint = this.view === 'dashboard' ? 'PRESS · CLOSE' : IDLE_HINT
+    return this.display.set(ID.footer, this.pages.length > 1 ? `PAGE ${n + 1}/${this.pages.length} · SWIPE` : hint)
   }
 
   private async showPage(n: number) {
     this.typing?.skip()
     this.page = n
-    void this.display.set(
-      ID.footer,
-      this.pages.length > 1 ? `PAGE ${n + 1}/${this.pages.length} · SWIPE` : IDLE_HINT,
-    )
+    void this.footerFor(n)
     const t = typewrite(this.display, ID.body, this.pages[n])
     this.typing = t
     await t.done
@@ -173,6 +273,15 @@ export class Assistant {
     this.spinner = undefined
   }
 }
+
+/** Lowercase, no punctuation, and no leading "Jarvis," so "Jarvis, open dashboard." matches. */
+const normalise = (s: string) =>
+  s
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/^(?:hey |ok |okay )?jarvis\s*/, '')
 
 /** Dry, in-character error lines that still say what to fix. */
 function explain(err: unknown, service: string): string {

@@ -2,18 +2,19 @@
   "package_id": "com.cijamie.evenjarvis",
   "edition": "202601",
   "name": "Even Jarvis",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "min_sdk_version": "0.0.16",
   "entrypoint": "index.html",
   "permissions": [
     {
       "name": "network",
-      "desc": "Sends your voice to Groq for transcription, your question to Google Gemini for an answer, and fetches weather and place names from Open-Meteo.",
+      "desc": "Sends your voice to Groq for transcription, your question to Google Gemini for an answer, fetches weather and place names from Open-Meteo, and exchange rates from open.er-api.com.",
       "whitelist": [
         "https://api.groq.com",
         "https://generativelanguage.googleapis.com",
         "https://api.open-meteo.com",
-        "https://geocoding-api.open-meteo.com"
+        "https://geocoding-api.open-meteo.com",
+        "https://open.er-api.com"
       ]
     },
     {
@@ -21,5 +22,7 @@
       "desc": "Records your voice from the glasses microphones while you hold the ring or touchpad to talk."
     }
   ],
-  "supported_languages": ["en"]
+  "supported_languages": [
+    "en"
+  ]
 }

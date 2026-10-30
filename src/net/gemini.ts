@@ -1,5 +1,6 @@
 import { ApiError, requestJson } from './http'
-import { getWeather, weatherDeclaration } from '../tools/weather'
+import { declarations, runTool, type ToolContext } from '../tools'
+import { localIso } from '../util/time'
 
 // Flash-Lite answers in ~1 s on the free tier; full Flash is the fallback.
 const MODELS = ['gemini-flash-lite-latest', 'gemini-flash-latest']
@@ -8,9 +9,7 @@ const BASE = 'https://generativelanguage.googleapis.com/v1beta/models'
 type Part = { text?: string; functionCall?: { name: string; args: any }; functionResponse?: any; [k: string]: unknown }
 type Content = { role: 'user' | 'model'; parts: Part[] }
 
-const TOOLS: Record<string, (args: any) => Promise<unknown>> = {
-  get_weather: getWeather,
-}
+export type Reply = { text: string; actions: ToolContext['actions'] }
 
 function systemPrompt() {
   const now = new Date()
@@ -21,8 +20,13 @@ function systemPrompt() {
     'Keep it to one to three short sentences, under 60 words, unless asked for more detail.',
     'Be accurate first, witty second. Answer the question before any quip.',
     'If something needs live data you have no tool for, say so briefly.',
+    'Use your tools for timers, reminders, calendar events, notes, weather, currency and the dashboard.',
+    'Never say you have set, saved, added or deleted something unless you called the tool and it succeeded.',
+    'Write times and numbers as digits, e.g. 18:00, 3:30pm, £37.46.',
+    'Work out exact local times yourself from relative phrases like "in 20 minutes" or "Tuesday at 3".',
+    'The calendar is your own, kept on the phone; you cannot see Google or iCloud calendars.',
     `It is ${now.toLocaleString('en-GB', { dateStyle: 'full', timeStyle: 'short' })}` +
-      ` (${Intl.DateTimeFormat().resolvedOptions().timeZone}).`,
+      ` (local ISO ${localIso(now.getTime())}, ${Intl.DateTimeFormat().resolvedOptions().timeZone}).`,
   ].join(' ')
 }
 
@@ -30,16 +34,20 @@ function systemPrompt() {
 export class Brain {
   private history: Content[] = []
 
-  constructor(private getKey: () => Promise<string>) {}
+  constructor(
+    private getKey: () => Promise<string>,
+    private context: Omit<ToolContext, 'actions'>,
+  ) {}
 
   reset() {
     this.history = []
   }
 
-  async ask(question: string): Promise<string> {
+  async ask(question: string): Promise<Reply> {
     const key = await this.getKey()
     if (!key) throw new ApiError('key', 'no Gemini key')
 
+    const ctx: ToolContext = { ...this.context, actions: new Set() }
     const turn: Content[] = [{ role: 'user', parts: [{ text: question }] }]
     // Tool calls loop: model asks for a function, we run it and send the result back.
     for (let step = 0; step < 4; step++) {
@@ -50,17 +58,12 @@ export class Brain {
       if (!calls.length) {
         const answer = clean(content.parts.map((p) => p.text ?? '').join(''))
         this.remember(question, answer)
-        return answer
+        return { text: answer, actions: ctx.actions }
       }
       const responses = await Promise.all(
         calls.map(async ({ functionCall }) => {
-          const fn = TOOLS[functionCall!.name]
-          let response: unknown
-          try {
-            response = fn ? await fn(functionCall!.args ?? {}) : { error: 'unknown tool' }
-          } catch (err) {
-            response = { error: String(err instanceof Error ? err.message : err) }
-          }
+          console.log(`[tool] ${functionCall!.name}`, functionCall!.args)
+          const response = await runTool(functionCall!.name, functionCall!.args, ctx)
           return { functionResponse: { name: functionCall!.name, response: { result: response } } }
         }),
       )
@@ -87,7 +90,7 @@ export class Brain {
             body: JSON.stringify({
               systemInstruction: { parts: [{ text: systemPrompt() }] },
               contents,
-              tools: [{ functionDeclarations: [weatherDeclaration] }],
+              tools: [{ functionDeclarations: declarations }],
               generationConfig: { maxOutputTokens: 1024 },
             }),
           },
