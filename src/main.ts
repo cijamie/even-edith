@@ -39,7 +39,9 @@ if (result !== 0) {
 }
 
 bridge.onEvenHubEvent((event) => {
-  if (event.textEvent?.eventType === OsEventTypeList.DOUBLE_CLICK_EVENT) {
+  // Gestures can arrive on textEvent or sysEvent (the simulator uses sysEvent).
+  const type = event.textEvent?.eventType ?? event.sysEvent?.eventType
+  if (type === OsEventTypeList.DOUBLE_CLICK_EVENT) {
     // Mode 1 shows the system exit dialog (required on the root page).
     bridge.shutDownPageContainer(1)
   }
