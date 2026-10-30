@@ -1,4 +1,6 @@
+import type { AudioSpeakerRole } from '@evenrealities/even_hub_sdk'
 import { ID } from '../hud/layout'
+import { speakerLabel } from '../data/transcript'
 import { isNoise, transcribe } from '../net/groq'
 import { clock, countdown } from '../util/time'
 import { Segmenter, type Segment } from '../voice/segmenter'
@@ -8,8 +10,9 @@ const MAX_MINUTES = 60
 
 const SUMMARY_PROMPT =
   'You summarise meeting transcripts for display on smart glasses. Plain text only, no markdown or bullets. ' +
+  'Lines may start with "You:" (the person wearing the glasses) or "Them:" (anyone else); use that to attribute points. ' +
   'Start with a two or three sentence summary. Then write "Actions:" followed by each action item as a short ' +
-  'sentence on its own line, naming the owner if mentioned. If there are none, write "Actions: none." Be concise.'
+  'sentence on its own line, naming the owner if mentioned ("You" for the wearer). If there are none, write "Actions: none." Be concise.'
 
 /** Records a conversation in ~30 s clips, transcribes as it goes, and summarises into a note on stop. */
 export class MeetingMode implements Mode {
@@ -43,8 +46,8 @@ export class MeetingMode implements Mode {
     if (this.segmenter.active) await this.segmenter.stop()
   }
 
-  audio(pcm: Uint8Array) {
-    this.segmenter.push(pcm)
+  audio(pcm: Uint8Array, role?: AudioSpeakerRole) {
+    this.segmenter.push(pcm, role)
   }
 
   tick() {
@@ -66,7 +69,7 @@ export class MeetingMode implements Mode {
     await this.segmenter.stop() // flushes the last clip
     while (this.busy || this.queue.length) await new Promise((r) => setTimeout(r, 200))
 
-    const text = this.transcript.join(' ').trim()
+    const text = this.transcript.join('\n').trim()
     if (!text) return this.host.finish('I heard nothing worth summarising.')
     try {
       const summary = await this.host.brain.complete(SUMMARY_PROMPT, text)
@@ -88,7 +91,9 @@ export class MeetingMode implements Mode {
           const said = await transcribe(seg.wav, await this.host.settings.get('groq'))
           await this.host.usage.add(seg.seconds)
           if (!isNoise(said)) {
-            this.transcript.push(said)
+            const label = speakerLabel(seg.speaker)
+            this.transcript.push(label ? `${label}: ${said}` : said)
+            this.host.transcript.add(said, seg.speaker)
             if (!this.stopping) void this.host.display.set(ID.body, `Recording. Press to stop and summarise.\n\n...${said.slice(-120)}`)
           }
         } catch (err) {

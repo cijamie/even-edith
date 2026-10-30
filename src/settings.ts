@@ -62,6 +62,42 @@ export class Settings {
     return this.store.set('edith.teleprompter', script)
   }
 
+  /** Recipe or how-to pasted on the phone, one step per line. */
+  guide(): Promise<string> {
+    return this.store.get('edith.guide')
+  }
+
+  setGuide(text: string): Promise<void> {
+    return this.store.set('edith.guide', text)
+  }
+
+  /** 'edith' | 'friday' | 'jarvis' ('' means EDITH). */
+  persona(): Promise<string> {
+    return this.store.get('edith.persona')
+  }
+
+  setPersona(id: string): Promise<void> {
+    return this.store.set('edith.persona', id)
+  }
+
+  /** "Hey EDITH" wake word: '1' on, '' off. */
+  async handsFree(): Promise<boolean> {
+    return (await this.store.get('edith.handsFree')) === '1'
+  }
+
+  setHandsFree(on: boolean): Promise<void> {
+    return this.store.set('edith.handsFree', on ? '1' : '')
+  }
+
+  /** Web app URL of the user's Google Calendar Apps Script, or ''. */
+  calendarUrl(): Promise<string> {
+    return this.store.get('edith.calendarUrl')
+  }
+
+  setCalendarUrl(url: string): Promise<void> {
+    return this.store.set('edith.calendarUrl', url)
+  }
+
   /** Free-form state the assistant keeps between launches (e.g. last briefing date). */
   getState(key: string): Promise<string> {
     return this.store.get(`edith.state.${key}`)

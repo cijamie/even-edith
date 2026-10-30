@@ -1,5 +1,7 @@
-import type { EvenAppBridge } from '@evenrealities/even_hub_sdk'
+import type { AudioSpeakerRole, EvenAppBridge } from '@evenrealities/even_hub_sdk'
 import type { Agenda } from '../data/agenda'
+import type { Lists } from '../data/lists'
+import type { Transcript } from '../data/transcript'
 import type { Locator } from '../geo/location'
 import type { Display } from '../hud/display'
 import type { Brain } from '../net/gemini'
@@ -17,7 +19,7 @@ export interface Mode {
   /** Return true if handled; otherwise a press closes the mode. */
   press?(): boolean
   swipe?(dir: 1 | -1): void
-  audio?(pcm: Uint8Array): void
+  audio?(pcm: Uint8Array, role?: AudioSpeakerRole): void
   /** Once a second while active. */
   tick?(): void
 }
@@ -31,6 +33,10 @@ export type Host = {
   brain: Brain
   locator: Locator
   usage: GroqUsage
+  lists: Lists
+  transcript: Transcript
+  /** Status lines for the diagnostics screen. */
+  diagnostics(): Promise<string[]>
   /** Leave the mode and show `text` as EDITH's reply (header defaults to the banner). */
   finish(text: string, header?: string): Promise<void>
 }

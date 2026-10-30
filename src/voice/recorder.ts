@@ -11,6 +11,9 @@ export class Recorder {
   private chunks: Uint8Array[] = []
   private bytes = 0
   private peak = 0
+  private onEnd?: () => void
+  private heard = false
+  private quietMs = 0
   recording = false
 
   constructor(
@@ -19,10 +22,14 @@ export class Recorder {
     private onLevel: (level: number) => void = () => {},
   ) {}
 
-  async start() {
+  /** With `onEnd` (hands-free), fires once the speaker stops: 1.2 s of quiet after speech, or 6 s of nothing. */
+  async start(onEnd?: () => void) {
     this.chunks = []
     this.bytes = 0
     this.peak = 0
+    this.onEnd = onEnd
+    this.heard = false
+    this.quietMs = 0
     this.recording = true
     await this.bridge.audioControl(true, AudioInputSource.Glasses)
   }
@@ -36,10 +43,25 @@ export class Recorder {
     this.peak = Math.max(this.peak, level)
     // Square-root curve so quiet speech still moves the meter.
     this.onLevel(Math.min(1, Math.sqrt(level * 5)))
+    if (this.onEnd) {
+      if (level > 0.02) {
+        this.heard = true
+        this.quietMs = 0
+      } else {
+        this.quietMs += (pcm.byteLength / (RATE * 2)) * 1000
+      }
+      const silentStart = !this.heard && this.bytes > RATE * 2 * 6
+      if ((this.heard && this.quietMs >= 1200) || silentStart || this.bytes >= RATE * 2 * MAX_SECONDS) {
+        const done = this.onEnd
+        this.onEnd = undefined
+        done()
+      }
+    }
   }
 
   async stop(): Promise<{ wav: Blob; seconds: number; peak: number }> {
     this.recording = false
+    this.onEnd = undefined
     await this.bridge.audioControl(false)
     const pcm = new Uint8Array(this.bytes)
     let offset = 0

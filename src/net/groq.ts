@@ -4,13 +4,15 @@ import type { Store } from '../store'
 const BASE = 'https://api.groq.com/openai/v1/audio'
 
 /** Speech to text with Groq's hosted Whisper. `translate` returns English whatever the spoken language. */
-export async function transcribe(wav: Blob, key: string, { translate = false } = {}): Promise<string> {
+export async function transcribe(wav: Blob, key: string, { translate = false, prompt = '' } = {}): Promise<string> {
   const form = new FormData()
   form.append('file', wav, 'speech.wav')
   // Translation needs full large-v3; turbo only transcribes.
   form.append('model', translate ? 'whisper-large-v3' : 'whisper-large-v3-turbo')
   form.append('response_format', 'json')
   form.append('temperature', '0')
+  // A hint of expected wording (e.g. the wake phrase) steers Whisper's spelling.
+  if (prompt) form.append('prompt', prompt)
   const body = await requestJson<{ text?: string }>(
     `${BASE}/${translate ? 'translations' : 'transcriptions'}`,
     { method: 'POST', headers: { Authorization: `Bearer ${key}` }, body: form },

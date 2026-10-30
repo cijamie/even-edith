@@ -1,22 +1,32 @@
+import type { AudioSpeakerRole } from '@evenrealities/even_hub_sdk'
 import { ID } from '../hud/layout'
 import { paginate } from '../hud/paginate'
 import { ApiError } from '../net/http'
 import { isNoise, transcribe, GROQ_FREE } from '../net/groq'
+import { speakerLabel, type Speaker } from '../data/transcript'
 import { Segmenter, type Segment } from '../voice/segmenter'
 import type { Host, Mode } from './mode'
 
 // Stay under Groq's free requests-per-minute with a little headroom.
 const MIN_GAP_MS = Math.ceil(60_000 / (GROQ_FREE.requestsPerMinute - 2))
 
-/** Live subtitles of nearby speech; with `translate`, any language comes out in English. */
+/**
+ * Live subtitles of nearby speech; with `translate`, any language comes out in English.
+ * Swipe up to rewind through what was said, down to return to live.
+ * Everything heard also goes to the shared transcript for "what did they just say?".
+ */
 export class CaptionsMode implements Mode {
   readonly name = 'captions'
   private text = ''
+  private lastSpeaker: Speaker = 'unknown'
   private queue: Segment[] = []
   private busy = false
   private lastRequest = 0
   private segmenter: Segmenter
   private status = ''
+  private pages: string[] = ['']
+  /** Page shown when rewound; null follows the live end. */
+  private rewind: number | null = null
 
   constructor(
     private host: Host,
@@ -41,8 +51,17 @@ export class CaptionsMode implements Mode {
     this.queue = []
   }
 
-  audio(pcm: Uint8Array) {
-    this.segmenter.push(pcm)
+  audio(pcm: Uint8Array, role?: AudioSpeakerRole) {
+    this.segmenter.push(pcm, role)
+  }
+
+  swipe(dir: 1 | -1) {
+    const last = this.pages.length - 1
+    const at = (this.rewind ?? last) + dir
+    if (at < 0) return
+    this.rewind = at >= last ? null : at
+    void this.host.display.set(ID.body, this.pages[this.rewind ?? last])
+    void this.footer()
   }
 
   private enqueue(s: Segment) {
@@ -65,7 +84,7 @@ export class CaptionsMode implements Mode {
           const said = await transcribe(seg.wav, key, { translate: this.translate })
           await this.host.usage.add(seg.seconds)
           this.status = ''
-          if (!isNoise(said)) this.append(said)
+          if (!isNoise(said)) this.append(said, seg.speaker)
         } catch (err) {
           this.status = err instanceof ApiError && err.kind === 'rate' ? 'GROQ BUSY · WAITING' : 'GROQ ERROR'
           if (err instanceof ApiError && err.kind === 'rate') this.lastRequest = Date.now() + 10_000
@@ -77,16 +96,23 @@ export class CaptionsMode implements Mode {
     }
   }
 
-  private append(said: string) {
-    this.text = `${this.text} ${said}`.trim().slice(-4000)
-    // Show the latest page so the newest words are always visible.
-    const pages = paginate(this.text)
-    void this.host.display.set(ID.body, pages[pages.length - 1])
+  private append(said: string, speaker: Speaker) {
+    this.host.transcript.add(said, speaker)
+    // A new line with a label whenever the (known) speaker changes.
+    const label = speakerLabel(speaker)
+    const turn = label && speaker !== this.lastSpeaker
+    if (speaker !== 'unknown') this.lastSpeaker = speaker
+    this.text = (turn ? `${this.text}\n${label.toUpperCase()}: ${said}` : `${this.text} ${said}`).trim().slice(-6000)
+    this.pages = paginate(this.text)
+    // Show the latest page so the newest words are always visible, unless rewound.
+    if (this.rewind === null) void this.host.display.set(ID.body, this.pages[this.pages.length - 1])
+    else void this.footer()
   }
 
   private footer() {
     const quota = this.host.usage.fraction
     const warn = quota > 0.8 ? ` · FREE QUOTA ${Math.round(quota * 100)}%` : ''
-    return this.host.display.set(ID.footer, (this.status || 'PRESS · STOP') + warn)
+    const where = this.rewind === null ? 'PRESS · STOP' : `REWIND ${this.rewind + 1}/${this.pages.length} · SWIPE DOWN · LIVE`
+    return this.host.display.set(ID.footer, (this.status || where) + warn)
   }
 }

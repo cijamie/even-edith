@@ -6,27 +6,41 @@ import { paginate } from './hud/paginate'
 import { Waveform } from './hud/waveform'
 import { Dashboard } from './hud/dashboard'
 import { Recorder } from './voice/recorder'
-import { isNoise, transcribe, type GroqUsage } from './net/groq'
+import { matchWake, WakeListener, type Utterance } from './voice/wake'
+import { isNoise, transcribe, GROQ_FREE, type GroqUsage } from './net/groq'
 import { Brain } from './net/gemini'
 import { ApiError } from './net/http'
 import type { Agenda } from './data/agenda'
 import type { Memory } from './data/memory'
+import type { Lists } from './data/lists'
+import type { Transcript } from './data/transcript'
+import type { GoogleCalendar } from './data/gcal'
 import type { Locator } from './geo/location'
 import type { Settings } from './settings'
+import { persona, type PersonaId } from './persona'
 import { RADAR_CATEGORIES, type Action, type Protocol } from './tools'
+import { quickAnswer } from './tools/calc'
+import { offlineAnswer } from './offline'
 import type { Host, Mode } from './modes/mode'
 import { CaptionsMode } from './modes/captions'
 import { MeetingMode } from './modes/meeting'
 import { TeleprompterMode } from './modes/teleprompter'
 import { MapMode, RadarMode } from './modes/map'
+import { NavMode } from './modes/nav'
+import { GuideMode } from './modes/guide'
+import { ListMode } from './modes/list'
+import { ActivityMode } from './modes/activity'
+import { bar, SuitMode } from './modes/suit'
 import { clock, countdown } from './util/time'
 
 type State = 'idle' | 'listening' | 'thinking'
 type View = 'answer' | 'dashboard'
 
-const IDLE_HINT = 'HOLD · TALK'
 const HUD_CHROME = { [ID.tl]: GLYPHS.tl, [ID.tr]: GLYPHS.tr, [ID.bl]: GLYPHS.bl, [ID.br]: GLYPHS.br }
 const NUDGE_LEAD_MS = 10 * 60_000
+// Wake checks share Groq's free requests-per-minute with everything else; leave room.
+const WAKE_GAP_MS = Math.ceil(60_000 / (GROQ_FREE.requestsPerMinute - 6))
+const WAKE_PROMPT = 'Hey EDITH.'
 
 // Handled locally so these open instantly, without a round trip to Gemini.
 const FAST: [RegExp, Action | 'close'][] = [
@@ -36,13 +50,32 @@ const FAST: [RegExp, Action | 'close'][] = [
   [/^(?:start |open )?(?:translat(?:e|ion|or))(?: mode)?$/, { type: 'captions', translate: true }],
   [/^(?:open |start )?(?:the )?teleprompter\b/, { type: 'teleprompter' }],
   [/^(?:start |record )(?:a |the )?meeting\b|^meeting mode\b/, { type: 'meeting' }],
+  [/^(?:run |open |show )?(?:suit |system )?diagnostics\b|^status report\b/, { type: 'diagnostics' }],
+  [/^(?:start|turn on|enable) hands ?free\b/, { type: 'handsfree', on: true }],
+  [/^(?:stop|turn off|disable) hands ?free\b|^stop listening\b/, { type: 'handsfree', on: false }],
+  [/\bhouse party protocol\b/, { type: 'easter', id: 'house-party' }],
+  [/\bclean slate protocol\b/, { type: 'easter', id: 'clean-slate' }],
+  [/^i am iron ?man\b/, { type: 'easter', id: 'iron-man' }],
+  [/\bself destruct\b/, { type: 'easter', id: 'self-destruct' }],
+  [/^(?:are you there|you there|you up|wake up)\b/, { type: 'easter', id: 'there' }],
   [/^(?:close|hide|dismiss|exit)\b|^stop$/, 'close'],
 ]
+
+export type Deps = {
+  agenda: Agenda
+  memory: Memory
+  locator: Locator
+  usage: GroqUsage
+  lists: Lists
+  transcript: Transcript
+  calendar: GoogleCalendar
+}
 
 /**
  * Ring-to-talk loop: hold to record, release to transcribe (Groq Whisper),
  * ask (Gemini), then type the answer out with swipe paging. A single press also
- * starts/stops listening, as a fallback for long press.
+ * starts/stops listening, as a fallback for long press. With hands-free on,
+ * "Hey EDITH" does the same without touching the ring.
  * Also owns the dashboard, full-screen modes, protocols, alerts and briefings.
  */
 export class Assistant {
@@ -54,6 +87,7 @@ export class Assistant {
   private typing: Typing | null = null
   private waveform = new Waveform()
   private recorder: Recorder
+  private wake: WakeListener
   readonly brain: Brain
   private dashboard: Dashboard
   private spinner: ReturnType<typeof setInterval> | undefined
@@ -65,33 +99,48 @@ export class Assistant {
   private device: DeviceStatus | null = null
   private briefingCheck = false
   private host: Host
+  private live = false
+  private persona: PersonaId = 'edith'
+  private handsFree = false
+  private wakeBusy = false
+  private lastWakeRequest = 0
+  private agenda: Agenda
+  private lists: Lists
+  private usage: GroqUsage
+  private calendar: GoogleCalendar
+  private locator: Locator
 
   constructor(
     private bridge: EvenAppBridge,
     private display: Display,
     private settings: Settings,
-    private agenda: Agenda,
-    memory: Memory,
-    locator: Locator,
-    usage: GroqUsage,
+    deps: Deps,
   ) {
+    ;({ agenda: this.agenda, lists: this.lists, usage: this.usage, calendar: this.calendar, locator: this.locator } = deps)
     this.recorder = new Recorder(bridge, (level) => void this.display.set(ID.footer, this.waveform.push(level)))
+    this.wake = new WakeListener(bridge, (u) => void this.onUtterance(u))
     this.brain = new Brain(() => settings.get('gemini'), {
-      agenda,
+      agenda: deps.agenda,
       settings,
-      memory,
-      locator,
+      memory: deps.memory,
+      locator: deps.locator,
+      lists: deps.lists,
+      transcript: deps.transcript,
+      calendar: deps.calendar,
       deviceStatus: () => this.deviceSummary(),
     })
-    this.dashboard = new Dashboard(agenda, settings, () => this.statusLine())
+    this.dashboard = new Dashboard(deps.agenda, settings, () => this.statusLine())
     this.host = {
       bridge,
       display,
       settings,
-      agenda,
+      agenda: deps.agenda,
       brain: this.brain,
-      locator,
-      usage,
+      locator: deps.locator,
+      usage: deps.usage,
+      lists: deps.lists,
+      transcript: deps.transcript,
+      diagnostics: () => this.diagnostics(),
       finish: (text, header) => this.closeMode(text, header),
     }
     void bridge
@@ -102,10 +151,40 @@ export class Assistant {
     setInterval(() => void this.tick(), 1000)
   }
 
+  /** Loads preferences; call once the boot sequence is done. */
+  async start() {
+    await this.loadPrefs()
+    this.live = true
+    this.syncWake()
+    void this.calendar.sync().catch(() => {})
+  }
+
+  /** Re-reads personality and hands-free after the phone settings change. */
+  async loadPrefs() {
+    const previous = this.persona
+    this.persona = ((await this.settings.persona()) || 'edith') as PersonaId
+    this.handsFree = await this.settings.handsFree()
+    if (previous !== this.persona) this.brain.reset()
+    if (!this.live) return
+    this.syncWake()
+    if (!this.mode && this.state === 'idle' && this.view === 'answer') {
+      void this.display.set(ID.header, this.banner)
+      void this.display.set(ID.footer, this.idleHint)
+    }
+  }
+
+  get name() {
+    return persona(this.persona).name
+  }
+
   get banner() {
     if (this.protocol === 'focus') return `FOCUS · ${countdown((this.focusEndsAt - Date.now()) / 1000)}`
-    if (this.protocol === 'night') return 'E.D.I.T.H. // NIGHT'
-    return 'E.D.I.T.H. // ONLINE'
+    if (this.protocol === 'night') return `${this.name} // NIGHT`
+    return `${this.name} // ONLINE`
+  }
+
+  get idleHint() {
+    return this.handsFree ? `"HEY ${this.persona.toUpperCase()}" · HOLD` : 'HOLD · TALK'
   }
 
   get activeMode() {
@@ -114,8 +193,10 @@ export class Assistant {
 
   handle(event: EvenHubEvent) {
     if (event.audioEvent) {
-      if (this.mode?.audio) this.mode.audio(event.audioEvent.audioPcm)
-      else this.recorder.push(event.audioEvent.audioPcm)
+      const a = event.audioEvent
+      if (this.mode?.audio) this.mode.audio(a.audioPcm, a.speakerRole)
+      else if (this.recorder.recording) this.recorder.push(a.audioPcm)
+      else if (this.wake.active) this.wake.push(a)
       return
     }
     // Gestures can arrive on textEvent or sysEvent (the simulator uses sysEvent),
@@ -182,7 +263,7 @@ export class Assistant {
 
   async run(action: Action) {
     // Views draw over the HUD layout, so leave any full-screen mode first.
-    if (this.mode && ['dashboard', 'briefing', 'protocol'].includes(action.type)) await this.closeMode()
+    if (this.mode && ['dashboard', 'briefing', 'protocol', 'handsfree', 'persona', 'easter'].includes(action.type)) await this.closeMode()
     switch (action.type) {
       case 'dashboard':
         return this.openDashboard()
@@ -200,6 +281,24 @@ export class Assistant {
         return this.enterMode(new MeetingMode(this.host))
       case 'teleprompter':
         return this.enterMode(new TeleprompterMode(this.host))
+      case 'navigate': {
+        const cat = action.category && RADAR_CATEGORIES[action.category]
+        return this.enterMode(new NavMode(this.host, action.query, cat ? { label: action.category!.replace('_', ' '), osmTag: cat } : undefined))
+      }
+      case 'guide':
+        return this.enterMode(new GuideMode(this.host, action.topic))
+      case 'list':
+        return this.enterMode(new ListMode(this.host, action.name))
+      case 'activity':
+        return this.enterMode(new ActivityMode(this.host, action.kind))
+      case 'diagnostics':
+        return this.enterMode(new SuitMode(this.host))
+      case 'handsfree':
+        return this.setHandsFree(action.on)
+      case 'persona':
+        return this.setPersona(action.id)
+      case 'easter':
+        return this.easterEgg(action.id)
     }
   }
 
@@ -209,6 +308,8 @@ export class Assistant {
     this.stopSpin()
     this.state = 'idle'
     this.view = 'answer'
+    // A mode that listens takes over the mic, so the wake listener steps aside without closing it.
+    if (mode.audio && this.wake.active) await this.wake.stop(false)
     this.mode = mode
     try {
       await mode.enter()
@@ -225,7 +326,8 @@ export class Assistant {
     if (mode) await mode.exit().catch(() => {})
     if (this.display.layout !== 'hud') await this.display.setLayout('hud', HUD_CHROME)
     this.view = 'answer'
-    await Promise.all([this.display.set(ID.header, header ?? this.banner), this.display.set(ID.footer, IDLE_HINT)])
+    await Promise.all([this.display.set(ID.header, header ?? this.banner), this.display.set(ID.footer, this.idleHint)])
+    this.syncWake()
     if (text) await this.say(text)
     else await this.display.set(ID.body, ' ')
   }
@@ -247,7 +349,7 @@ export class Assistant {
     await Promise.all([
       this.display.set(ID.header, this.banner),
       this.display.set(ID.body, ' '),
-      this.display.set(ID.footer, IDLE_HINT),
+      this.display.set(ID.footer, this.idleHint),
     ])
   }
 
@@ -271,11 +373,82 @@ export class Assistant {
     await this.say(lines[name])
   }
 
+  private async setHandsFree(on: boolean) {
+    if (on && !(await this.settings.get('groq'))) return this.say('Hands-free needs a Groq key. Add one in the phone app.')
+    await this.settings.setHandsFree(on)
+    this.handsFree = on
+    this.syncWake()
+    void this.display.set(ID.footer, this.idleHint)
+    await this.say(
+      on
+        ? `Hands-free on. Say "Hey ${this.persona === 'edith' ? 'EDITH' : this.persona.charAt(0).toUpperCase() + this.persona.slice(1)}" any time. It uses more battery.`
+        : 'Hands-free off. Hold the ring to talk.',
+    )
+  }
+
+  private async setPersona(id: PersonaId) {
+    await this.settings.setPersona(id)
+    this.persona = id
+    this.brain.reset()
+    void this.display.set(ID.header, this.banner)
+    void this.display.set(ID.footer, this.idleHint)
+    const lines: Record<PersonaId, string> = {
+      edith: 'E.D.I.T.H. online. Back to business.',
+      friday: "F.R.I.D.A.Y. here. Grand to meet you properly.",
+      jarvis: 'J.A.R.V.I.S. at your service. Shall we begin?',
+    }
+    await this.say(lines[id])
+  }
+
+  private async easterEgg(id: string) {
+    this.view = 'answer'
+    switch (id) {
+      case 'house-party': {
+        void this.display.set(ID.header, 'HOUSE PARTY PROTOCOL')
+        let log = ''
+        for (const mark of ['MARK 7', 'MARK 16', 'MARK 33', 'MARK 39', 'MARK 42']) {
+          log += `> ${mark} ... ONLINE\n`
+          await this.display.set(ID.body, log)
+          await sleep(220)
+        }
+        await sleep(500)
+        await this.say("All suits accounted for. They're imaginary, but the enthusiasm is real.")
+        break
+      }
+      case 'clean-slate':
+        void this.display.set(ID.header, 'CLEAN SLATE PROTOCOL')
+        await this.say('Display wiped. Nothing to see here.')
+        await sleep(1500)
+        this.pages = []
+        await this.display.set(ID.body, ' ')
+        void this.display.set(ID.header, this.banner)
+        break
+      case 'iron-man':
+        await this.say("And I'm a pair of glasses. Let's not get carried away.")
+        break
+      case 'self-destruct':
+        void this.display.set(ID.header, '● SELF DESTRUCT ●')
+        for (const n of ['3', '2', '1']) {
+          await this.display.set(ID.body, n)
+          await sleep(700)
+        }
+        await this.say('Self-destruct requires two-factor authentication. Crisis averted.')
+        void this.display.set(ID.header, this.banner)
+        break
+      default:
+        await this.say(`Always. ${this.name} is listening.`)
+    }
+  }
+
   // ── Once a second ────────────────────────────────────────────────
 
   private async tick() {
     this.mode?.tick?.()
     const now = Date.now()
+    if (this.live) {
+      this.syncWake()
+      void this.calendar.sync().catch(() => {})
+    }
 
     const due = await this.agenda.takeDue()
     for (const t of due.timers) this.alerts.push(`Your ${t.label === 'timer' ? '' : t.label + ' '}timer is done.`)
@@ -365,20 +538,93 @@ export class Assistant {
     return { batteryPercent: s.batteryLevel, charging: s.isCharging, wearing: s.isWearing, inCase: s.isInCase, connection: String(s.connectType) }
   }
 
+  /** Suit diagnostics lines. Phone battery and network come from the WebView where it exposes them (Android does; iOS doesn't). */
+  private async diagnostics(): Promise<string[]> {
+    const lines: string[] = []
+    const s = this.device
+    lines.push(
+      s?.batteryLevel != null
+        ? `G2    ${bar(s.batteryLevel)} ${s.batteryLevel}%${s.isCharging ? ' CHG' : s.isWearing === false ? ' OFF' : ''}`
+        : 'G2    NO TELEMETRY',
+    )
+    try {
+      const b = await (navigator as any).getBattery?.()
+      lines.push(b ? `PHONE ${bar(b.level * 100)} ${Math.round(b.level * 100)}%${b.charging ? ' CHG' : ''}` : 'PHONE NO TELEMETRY')
+    } catch {
+      lines.push('PHONE NO TELEMETRY')
+    }
+    const conn = (navigator as any).connection
+    lines.push(`NET   ${navigator.onLine ? 'ONLINE' : 'OFFLINE'}${conn?.effectiveType ? ` · ${String(conn.effectiveType).toUpperCase()}` : ''}`)
+    const fix = await this.locator.get(60_000)
+    lines.push(fix ? `GPS   ${fix.source === 'phone' ? 'PHONE' : fix.source === 'browser' ? 'BROWSER' : 'HOME CITY'}${fix.accuracy ? ` ±${Math.round(fix.accuracy)}m` : ''}` : 'GPS   NO FIX')
+    const keys = await this.settings.all()
+    lines.push(`VOICE ${keys.groq ? `${bar(100 - this.usage.fraction * 100)} ${Math.round(100 - this.usage.fraction * 100)}% QUOTA` : 'NO KEY'}`)
+    lines.push(`CORE  ${keys.gemini ? 'GEMINI ONLINE' : 'NO KEY'}`)
+    lines.push(`WAKE  ${this.handsFree ? (this.wake.active ? 'ARMED' : 'PAUSED') : 'OFF'}`)
+    lines.push(`CAL   ${(await this.calendar.linked()) ? (this.calendar.lastError ? 'GOOGLE · SYNC FAILED' : 'GOOGLE LINKED') : 'LOCAL ONLY'}`)
+    lines.push(`AI    ${this.name} · ${this.protocol.toUpperCase()}`)
+    return lines
+  }
+
+  // ── Hands-free ───────────────────────────────────────────────────
+
+  /** Keeps the wake listener running exactly when it should own the mic. */
+  private syncWake() {
+    const want = this.live && this.handsFree && this.state !== 'listening' && !this.mode?.audio && !this.recorder.recording
+    if (want && !this.wake.active) void this.wake.start().catch((err) => console.warn('[wake] mic failed', err))
+    else if (!want && this.wake.active && !this.recorder.recording && !this.mode?.audio) void this.wake.stop(true)
+  }
+
+  private async onUtterance(u: Utterance) {
+    if (this.wakeBusy || this.state !== 'idle') return
+    // Spread checks out; a dropped burst just means saying it again.
+    if (Date.now() - this.lastWakeRequest < WAKE_GAP_MS) return
+    if (this.usage.fraction > 0.95) {
+      this.handsFree = false
+      this.syncWake()
+      this.alerts.push("Hands-free paused: today's free Groq quota is nearly used up. Hold the ring to talk.")
+      return
+    }
+    const key = await this.settings.get('groq')
+    if (!key) return
+    this.wakeBusy = true
+    this.lastWakeRequest = Date.now()
+    try {
+      const said = await transcribe(u.wav, key, { prompt: WAKE_PROMPT })
+      await this.usage.add(u.seconds)
+      const command = matchWake(said)
+      console.log(`[wake] "${said}" →`, command === null ? 'no wake' : `"${command}"`)
+      if (command === null || this.state !== 'idle') return
+      if (command.split(/\s+/).filter(Boolean).length >= 2) {
+        // "Hey EDITH, what's the weather" in one breath: answer it directly.
+        await this.handleText(command)
+      } else {
+        if (this.mode) await this.closeMode()
+        await this.listen(true)
+      }
+    } catch (err) {
+      console.warn('[wake] check failed', err)
+    } finally {
+      this.wakeBusy = false
+    }
+  }
+
   // ── Talking ──────────────────────────────────────────────────────
 
-  private async listen() {
+  /** `auto`: started by the wake word, so stop by itself when the speaker goes quiet. */
+  private async listen(auto = false) {
     this.skipTyping()
     this.state = 'listening'
     this.view = 'answer'
     this.waveform.reset()
+    if (this.wake.active) await this.wake.stop(false)
     await Promise.all([
       this.display.set(ID.header, 'LISTENING'),
       this.display.set(ID.body, ' '),
       this.display.set(ID.footer, this.waveform.render()),
     ])
     try {
-      await this.recorder.start()
+      await this.recorder.start(auto ? () => void this.respond() : undefined)
     } catch (err) {
       console.error(err)
       this.state = 'idle'
@@ -387,6 +633,7 @@ export class Assistant {
   }
 
   private async respond() {
+    if (this.state !== 'listening') return
     this.state = 'thinking'
     const audio = await this.recorder.stop()
     console.log(`[voice] ${audio.seconds.toFixed(1)}s, peak ${audio.peak.toFixed(3)}`)
@@ -400,7 +647,7 @@ export class Assistant {
     let question: string
     try {
       question = await transcribe(audio.wav, groqKey)
-      await this.host.usage.add(audio.seconds)
+      await this.usage.add(audio.seconds)
     } catch (err) {
       return this.finish(explain(err, 'Groq'))
     }
@@ -422,6 +669,10 @@ export class Assistant {
     }
 
     void this.display.set(ID.header, `» ${truncate(question, 34)}`)
+    // Simple maths answers locally: instant, exact, and works with no signal.
+    const quick = quickAnswer(question)
+    if (quick) return this.finish(quick, true)
+
     this.spin('THINKING')
     try {
       const reply = await this.brain.ask(question)
@@ -434,6 +685,11 @@ export class Assistant {
       return this.finish(reply.text || 'I have nothing useful to add, which is rare.', true)
     } catch (err) {
       console.error(err)
+      // No connection: answer from what's on the phone if the question allows it.
+      if (err instanceof ApiError && (err.kind === 'blocked' || err.kind === 'timeout')) {
+        const local = offlineAnswer(command, { agenda: this.agenda, lists: this.lists, dashboard: this.dashboard })
+        if (local) return this.finish(`${local}\n(Offline: from the phone.)`, true)
+      }
       return this.finish(explain(err, 'Gemini'))
     }
   }
@@ -442,11 +698,13 @@ export class Assistant {
     this.stopSpin()
     this.state = 'idle'
     if (!keepQuestion) void this.display.set(ID.header, this.banner)
+    void this.display.set(ID.footer, this.idleHint)
+    this.syncWake()
     await this.say(text)
   }
 
   private footerFor(n: number) {
-    const hint = this.view === 'dashboard' ? 'PRESS · CLOSE' : IDLE_HINT
+    const hint = this.view === 'dashboard' ? 'PRESS · CLOSE' : this.idleHint
     return this.display.set(ID.footer, this.pages.length > 1 ? `PAGE ${n + 1}/${this.pages.length} · SWIPE` : hint)
   }
 
@@ -487,7 +745,7 @@ const normalise = (s: string) =>
     .replace(/[^\p{L}\p{N}\s]/gu, ' ')
     .replace(/\s+/g, ' ')
     .trim()
-    .replace(/^(?:hey |ok |okay )?(?:edith|edit|jarvis)\s*/, '')
+    .replace(/^(?:hey |ok |okay )?(?:edith|edit|jarvis|friday)\s*/, '')
 
 /** Dry, in-character error lines that still say what to fix. */
 function explain(err: unknown, service: string): string {

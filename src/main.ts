@@ -5,6 +5,10 @@ import { Store } from './store'
 import { Settings } from './settings'
 import { Agenda } from './data/agenda'
 import { Memory } from './data/memory'
+import { Lists } from './data/lists'
+import { Transcript } from './data/transcript'
+import { GoogleCalendar } from './data/gcal'
+import { persona } from './persona'
 import { Locator } from './geo/location'
 import { GroqUsage } from './net/groq'
 import { setLocator } from './net/diagnostics'
@@ -14,6 +18,10 @@ import { mountDiagnostics } from './phone/diagnostics-ui'
 import { mountMirror } from './phone/mirror-ui'
 import { mountTeleprompter } from './phone/teleprompter-ui'
 import { mountMemory } from './phone/memory-ui'
+import { mountGuide } from './phone/guide-ui'
+import { mountLists } from './phone/lists-ui'
+import { mountNotes } from './phone/notes-ui'
+import { mountCalendar } from './phone/calendar-ui'
 import { Display } from './hud/display'
 import { ID } from './hud/layout'
 import { boot } from './hud/boot'
@@ -33,7 +41,10 @@ const settings = new Settings(store)
 const agenda = new Agenda(store)
 const memory = new Memory(store)
 const usage = new GroqUsage(store)
-await Promise.all([agenda.load(), memory.load(), usage.load()])
+const lists = new Lists(store)
+await Promise.all([agenda.load(), memory.load(), usage.load(), lists.load()])
+const transcript = new Transcript()
+const calendar = new GoogleCalendar(settings, agenda)
 const locator = new Locator(bridge, settings)
 setLocator(() => locator.get(0))
 
@@ -41,7 +52,7 @@ if (new URLSearchParams(location.search).has('probe')) {
   await runProbe(bridge)
 } else {
   const display = new Display(bridge)
-  const assistant = new Assistant(bridge, display, settings, agenda, memory, locator, usage)
+  const assistant = new Assistant(bridge, display, settings, { agenda, memory, locator, usage, lists, transcript, calendar })
   // Dev hook: drive the assistant from the console, e.g. edith.handleText('open dashboard').
   if (import.meta.env.DEV) Object.assign(window, { edith: assistant })
 
@@ -65,8 +76,10 @@ if (new URLSearchParams(location.search).has('probe')) {
         { label: 'NEURAL CORE  [GEMINI]', ok: !!keys.gemini },
       ],
       await greeting(),
+      persona(await settings.persona()),
     )
-    await display.set(ID.footer, 'HOLD · TALK')
+    await assistant.start()
+    await display.set(ID.footer, assistant.idleHint)
     ready = true
   }
 
@@ -79,8 +92,12 @@ if (new URLSearchParams(location.search).has('probe')) {
   })
   const onSettingsChanged = () => ready && void greeting().then((text) => assistant.say(text))
   await mountKeys(document.getElementById('keys')!, settings, onSettingsChanged)
-  await mountPrefs(document.getElementById('prefs')!, settings, () => {})
+  await mountPrefs(document.getElementById('prefs')!, settings, () => void assistant.loadPrefs())
   await mountTeleprompter(document.getElementById('teleprompter')!, settings, () => ready && void assistant.run({ type: 'teleprompter' }))
+  await mountGuide(document.getElementById('guide')!, settings, () => ready && void assistant.run({ type: 'guide' }))
+  mountLists(document.getElementById('lists')!, lists, (name) => ready && void assistant.run({ type: 'list', name }))
+  mountNotes(document.getElementById('notes')!, agenda)
+  await mountCalendar(document.getElementById('calendar')!, settings, calendar)
   mountMemory(document.getElementById('memory')!, memory)
   mountDiagnostics(document.getElementById('diagnostics')!, settings)
 
@@ -105,7 +122,7 @@ if (new URLSearchParams(location.search).has('probe')) {
 async function greeting() {
   const keys = await settings.all()
   const missing = [!keys.groq && 'Groq', !keys.gemini && 'Gemini'].filter(Boolean)
-  if (!missing.length) return 'All systems nominal. Hold to speak.'
+  if (!missing.length) return (await settings.handsFree()) ? 'All systems nominal. Say my name or hold to speak.' : 'All systems nominal. Hold to speak.'
   const [noun, pronoun] = missing.length > 1 ? ['keys', 'them'] : ['key', 'it']
   return `I'm missing my ${missing.join(' and ')} ${noun}. Open Even EDITH on your phone to add ${pronoun}.`
 }

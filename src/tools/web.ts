@@ -2,7 +2,7 @@ import { requestJson } from '../net/http'
 
 /**
  * Free, keyless lookups: DuckDuckGo instant answers plus Wikipedia search
- * with intro extracts. Good for facts and anything Wikipedia covers; not live news.
+ * with intro extracts. The fallback when Google Search grounding is unavailable.
  */
 export async function webLookup({ query }: { query: string }) {
   const [ddg, wiki] = await Promise.allSettled([duckDuckGo(query), wikipedia(query)])

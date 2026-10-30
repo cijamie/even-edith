@@ -11,10 +11,10 @@ const POWER = '▁▂▃▄▅▆▇█'
  * Stark Industries boot, three acts:
  * 1. Arc reactor spins up, brackets draw in, power bar fills.
  * 2. Initialising: systems check.
- * 3. EDITH appears: E.D.I.T.H. // ONLINE, tagline, greeting.
+ * 3. The assistant appears (E.D.I.T.H. // ONLINE, or the chosen personality), tagline, greeting.
  * Expects the display to be on the 'boot' layout; leaves it on 'hud'.
  */
-export async function boot(display: Display, checks: Check[], greeting: string) {
+export async function boot(display: Display, checks: Check[], greeting: string, who = { name: 'E.D.I.T.H.', tagline: "EVEN DEAD, I'M THE HERO." }) {
   const t0 = performance.now()
 
   // Act 1: the reactor. Brackets grow alongside the first frames.
@@ -60,8 +60,8 @@ export async function boot(display: Display, checks: Check[], greeting: string) 
 
   // Act 3: EDITH.
   await Promise.all([display.set(ID.body, ' '), display.set(ID.footer, ' ')])
-  await typewrite(display, ID.header, 'E.D.I.T.H. // ONLINE', { cps: 50 }).done
-  await typewrite(display, ID.body, "EVEN DEAD, I'M THE HERO.", { cps: 45 }).done
+  await typewrite(display, ID.header, `${who.name} // ONLINE`, { cps: 50 }).done
+  await typewrite(display, ID.body, who.tagline, { cps: 45 }).done
   await sleep(700)
   await typewrite(display, ID.body, greeting).done
 

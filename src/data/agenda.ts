@@ -2,7 +2,7 @@ import type { Store } from '../store'
 
 export type Timer = { id: string; label: string; endsAt: number; seconds: number }
 export type Reminder = { id: string; text: string; at: number }
-export type CalEvent = { id: string; title: string; start: number; end?: number; nudged?: boolean }
+export type CalEvent = { id: string; title: string; start: number; end?: number; nudged?: boolean; source?: 'google'; allDay?: boolean }
 export type Note = { id: string; text: string; createdAt: number }
 
 type Data = { timers: Timer[]; reminders: Reminder[]; events: CalEvent[]; notes: Note[] }
@@ -81,6 +81,16 @@ export class Agenda {
     return n
   }
 
+  /** Replaces the events synced from Google Calendar, keeping heads-up flags for ones already nudged. */
+  async replaceExternal(events: CalEvent[]) {
+    const nudged = new Set(this.data.events.filter((e) => e.source === 'google' && e.nudged).map((e) => e.id))
+    this.data.events = [
+      ...this.data.events.filter((e) => e.source !== 'google'),
+      ...events.map((e) => ({ ...e, source: 'google' as const, nudged: nudged.has(e.id) || undefined })),
+    ]
+    await this.save()
+  }
+
   /** Removes items by id from any list; returns how many were removed. */
   async remove(kind: keyof Data, ids: string[]) {
     const list = this.data[kind] as { id: string }[]
@@ -93,7 +103,7 @@ export class Agenda {
 
   /** Events starting within `leadMs` that haven't had their heads-up yet; marks them as nudged. */
   async takeUpcoming(leadMs: number, now = Date.now()) {
-    const soon = this.data.events.filter((e) => !e.nudged && e.start > now && e.start - now <= leadMs)
+    const soon = this.data.events.filter((e) => !e.nudged && !e.allDay && e.start > now && e.start - now <= leadMs)
     if (soon.length) {
       soon.forEach((e) => (e.nudged = true))
       await this.save()

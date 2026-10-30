@@ -143,6 +143,30 @@ export const CHECKS: Check[] = [
     },
   },
   {
+    id: 'gemini-search',
+    label: 'Gemini · Google Search',
+    async run(settings) {
+      const key = await settings.get('gemini')
+      if (!key) return needKey
+      if (!geminiModel) return { ok: false, verdict: 'SKIPPED', detail: 'Needs the key check to pass.' }
+      const r = await call(`${GEMINI}/models/${geminiModel}:generateContent`, {
+        method: 'POST',
+        headers: { 'x-goog-api-key': key, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ role: 'user', parts: [{ text: "What is today's date? One short sentence." }] }],
+          tools: [{ google_search: {} }],
+          generationConfig: { maxOutputTokens: 256 },
+        }),
+      })
+      if (!r.ok) return { ...r, detail: `${r.detail} Falls back to Wikipedia.` }
+      const grounded = !!r.body?.candidates?.[0]?.groundingMetadata
+      const text = r.body?.candidates?.[0]?.content?.parts?.map((p: any) => p.text).join('') ?? ''
+      return grounded
+        ? { ...r, detail: `Searched: “${text.trim().slice(0, 60)}”` }
+        : { ok: false, verdict: 'NO SEARCH', detail: 'Answered without searching. Live lookups may be stale.' }
+    },
+  },
+  {
     id: 'meteo',
     label: 'Open-Meteo · weather',
     async run() {
@@ -211,6 +235,45 @@ export const CHECKS: Check[] = [
       if (!w.ok) return { ...w, detail: `Wikipedia: ${w.detail}` }
       if (!d.ok) return { ...d, detail: `DuckDuckGo: ${d.detail}` }
       return { ok: true, verdict: 'OK', detail: 'Both answered.' }
+    },
+  },
+  {
+    id: 'routing',
+    label: 'Walking routes (OSRM)',
+    async run() {
+      const r = await call('https://routing.openstreetmap.de/routed-foot/route/v1/driving/-0.1276,51.5072;-0.1195,51.5033?overview=false')
+      return r.ok ? { ...r, detail: `${Math.round(r.body?.routes?.[0]?.distance ?? 0)} m test route.` } : r
+    },
+  },
+  {
+    id: 'transit',
+    label: 'Transit (Transitous)',
+    async run() {
+      const r = await call('https://api.transitous.org/api/v1/map/stops?min=51.500,-0.130&max=51.505,-0.120')
+      return r.ok ? { ...r, detail: `${r.body?.length ?? 0} stops in the test area.` } : r
+    },
+  },
+  {
+    id: 'live',
+    label: 'Scores and crypto (ESPN, CoinGecko)',
+    async run() {
+      const [e, c] = await Promise.all([
+        call('https://site.api.espn.com/apis/site/v2/sports/soccer/eng.1/scoreboard'),
+        call('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd'),
+      ])
+      if (!e.ok) return { ...e, detail: `ESPN: ${e.detail}` }
+      if (!c.ok) return { ...c, detail: `CoinGecko: ${c.detail}` }
+      return { ok: true, verdict: 'OK', detail: 'Both answered.' }
+    },
+  },
+  {
+    id: 'calendar',
+    label: 'Google Calendar (your script)',
+    async run(settings) {
+      const url = await settings.calendarUrl()
+      if (!url) return { ok: true, verdict: 'NOT LINKED', detail: 'Optional. Link it in the Google Calendar card.' }
+      const r = await call(`${url}?days=1`)
+      return r.ok ? { ...r, detail: `${r.body?.events?.length ?? 0} events today.` } : r
     },
   },
   {

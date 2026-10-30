@@ -40,6 +40,29 @@
         <div id="teleprompter"></div>
       </section>
 
+      <section class="card" aria-labelledby="guide-title">
+        <h2 id="guide-title">Recipes and guides</h2>
+        <p class="hint">Paste a recipe here, or just ask: "EDITH, walk me through pancakes". Swipe for steps; press to start a step's timer.</p>
+        <div id="guide"></div>
+      </section>
+
+      <section class="card" aria-labelledby="lists-title">
+        <h2 id="lists-title">Lists</h2>
+        <div id="lists"></div>
+      </section>
+
+      <section class="card" aria-labelledby="notes-title">
+        <h2 id="notes-title">Notes</h2>
+        <p class="hint">Meeting summaries and activity logs land here too. Share sends one to email or messages.</p>
+        <div id="notes"></div>
+      </section>
+
+      <section class="card" aria-labelledby="calendar-title">
+        <h2 id="calendar-title">Google Calendar</h2>
+        <p class="hint">Show your Google Calendar on the glasses, with heads-ups before events, and add events by voice.</p>
+        <div id="calendar"></div>
+      </section>
+
       <section class="card" aria-labelledby="memory-title">
         <h2 id="memory-title">Memory</h2>
         <div id="memory"></div>
@@ -54,7 +77,10 @@
         <div id="diagnostics"></div>
       </section>
 
-      <p class="credit">Map tiles © Esri, HERE, Garmin, © OpenStreetMap contributors. Places by Photon. Weather by Open-Meteo.</p>
+      <p class="credit">
+        Map tiles © Esri, HERE, Garmin, © OpenStreetMap contributors. Places by Photon. Walking routes by OSRM on
+        FOSSGIS servers. Transit by Transitous. Weather by Open-Meteo. Crypto prices by CoinGecko. Scores from ESPN.
+      </p>
     </main>
     <script type="module" src="./src/main.ts"></script>
   </body>

@@ -11,6 +11,8 @@ const WEATHER_TTL = 10 * 60_000
 export class Dashboard {
   private weather: { city: string; at: number; line: string; data?: Weather } | null = null
   private fetching: Promise<void> | null = null
+  /** undefined until loaded from storage. */
+  private saved: { city: string; at: number; line: string } | null | undefined = undefined
 
   constructor(
     private agenda: Agenda,
@@ -46,6 +48,11 @@ export class Dashboard {
     return parts.join(' ')
   }
 
+  /** Last good weather, kept between launches so the dashboard and offline answers have something. */
+  get cachedWeather() {
+    return this.saved
+  }
+
   /** Starts a weather fetch if the cache is stale; resolves when it lands. */
   refreshWeather(): Promise<void> {
     if (this.fetching) return this.fetching
@@ -56,11 +63,28 @@ export class Dashboard {
         return
       }
       if (this.weather?.city === city && Date.now() - this.weather.at < WEATHER_TTL) return
+      if (this.saved === undefined) {
+        try {
+          this.saved = JSON.parse((await this.settings.getState('weather')) || 'null')
+        } catch {
+          this.saved = null
+        }
+      }
       try {
         const data = await getWeather({ location: city })
         this.weather = { city, at: Date.now(), line: weatherLine(city, data), data }
+        if (!('error' in data)) {
+          this.saved = { city, at: Date.now(), line: this.weather.line }
+          void this.settings.setState('weather', JSON.stringify(this.saved))
+        }
       } catch {
-        this.weather = { city, at: Date.now() - WEATHER_TTL + 60_000, line: `${city.toUpperCase()} · WEATHER UNAVAILABLE` }
+        // No signal: show the last good reading with its age rather than nothing.
+        const old = this.saved?.city === city ? this.saved : null
+        this.weather = {
+          city,
+          at: Date.now() - WEATHER_TTL + 60_000,
+          line: old ? `${old.line} (${clock(old.at)})` : `${city.toUpperCase()} · WEATHER UNAVAILABLE`,
+        }
       }
     })().finally(() => (this.fetching = null))
     return this.fetching

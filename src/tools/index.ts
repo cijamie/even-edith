@@ -1,11 +1,18 @@
 import type { Agenda } from '../data/agenda'
 import type { Memory } from '../data/memory'
+import type { Lists } from '../data/lists'
+import type { Transcript } from '../data/transcript'
+import { speakerLabel } from '../data/transcript'
+import type { GoogleCalendar } from '../data/gcal'
 import type { Locator } from '../geo/location'
 import type { Settings } from '../settings'
 import { localIso, spokenDuration } from '../util/time'
 import { currencyDeclaration, convertCurrency } from './currency'
 import { getWeather, weatherAt, weatherDeclaration } from './weather'
 import { webLookup } from './web'
+import { convertUnits, evaluate, fmt, tipSplit } from './calc'
+import { cryptoPrice, departures, LEAGUES, scores } from './live'
+import { PERSONA_IDS, type PersonaId } from '../persona'
 
 export const PROTOCOLS = ['standard', 'focus', 'night', 'stealth'] as const
 export type Protocol = (typeof PROTOCOLS)[number]
@@ -20,6 +27,17 @@ export type Action =
   | { type: 'teleprompter' }
   | { type: 'briefing' }
   | { type: 'protocol'; name: Protocol; minutes?: number }
+  | { type: 'navigate'; query?: string; category?: string }
+  | { type: 'guide'; topic?: string }
+  | { type: 'list'; name: string }
+  | { type: 'activity'; kind: Activity }
+  | { type: 'diagnostics' }
+  | { type: 'handsfree'; on: boolean }
+  | { type: 'persona'; id: PersonaId }
+  | { type: 'easter'; id: string }
+
+export const ACTIVITIES = ['walk', 'run', 'ride'] as const
+export type Activity = (typeof ACTIVITIES)[number]
 
 /** What the tools can touch. */
 export type ToolContext = {
@@ -27,6 +45,11 @@ export type ToolContext = {
   memory: Memory
   settings: Settings
   locator: Locator
+  lists: Lists
+  transcript: Transcript
+  calendar: GoogleCalendar
+  /** Google Search grounding through Gemini. */
+  search: (query: string) => Promise<{ answer: string; sources: string[] }>
   /** Glasses battery etc., filled in from the SDK. */
   deviceStatus: () => Record<string, unknown>
   actions: Action[]
@@ -87,15 +110,204 @@ const tools: Record<string, Tool> = {
 
   convert_currency: { declaration: currencyDeclaration, run: (args) => convertCurrency(args) },
 
-  web_lookup: {
+  web_search: {
     declaration: {
-      name: 'web_lookup',
+      name: 'web_search',
       description:
-        'Look something up on Wikipedia and DuckDuckGo instant answers. Use for facts you are unsure of, people, places, ' +
-        'definitions and anything after your training. It is not a live news feed.',
-      parameters: obj({ query: str('Search query') }, ['query']),
+        'Search the web with Google. Use for news, current events, live prices and stock quotes, flight status, ' +
+        'opening hours, recent results, people, and any fact you are unsure of or that may have changed since training. ' +
+        'Write the query as a full question with any place or date that matters.',
+      parameters: obj({ query: str('The question to search for') }, ['query']),
     },
-    run: (args) => webLookup(args),
+    async run({ query }, { search }) {
+      try {
+        const r = await search(query)
+        if (r.answer) return r
+      } catch (err) {
+        console.warn('[search] grounding failed, falling back to Wikipedia', err)
+      }
+      // Google Search grounding has a daily free quota; Wikipedia keeps facts working past it.
+      return { ...(await webLookup({ query })), note: 'Google search unavailable; these are Wikipedia/DuckDuckGo results, not live.' }
+    },
+  },
+
+  recall_conversation: {
+    declaration: {
+      name: 'recall_conversation',
+      description:
+        'What people said recently while captions, translation or meeting mode were running (last 30 minutes, with "You"/"Them" ' +
+        'labels when known). Use for "what did they just say", "what was that name", "summarise the conversation".',
+      parameters: obj({ minutes: { type: 'number', description: 'How far back, default 3.' } }),
+    },
+    async run({ minutes }, { transcript }) {
+      const lines = transcript.since(Date.now() - Math.min(30, Math.max(0.5, Number(minutes) || 3)) * 60_000)
+      if (!lines.length) {
+        return { error: transcript.empty ? 'Nothing captured. Conversations are only heard while captions or meeting mode run.' : 'Nothing said in that window.' }
+      }
+      return lines.map((l) => `${clockOf(l.at)} ${speakerLabel(l.speaker) ? speakerLabel(l.speaker) + ': ' : ''}${l.text}`).join('\n')
+    },
+  },
+
+  calculate: {
+    declaration: {
+      name: 'calculate',
+      description: 'Exact arithmetic: + - * / ^ ( ) sqrt and percentages, e.g. "17.5% of 240", "(12+8)*3". Also tips and bill splits.',
+      parameters: obj({
+        expression: str('Arithmetic expression. Omit for a tip or split.'),
+        amount: { type: 'number', description: 'Bill amount, for tip/split' },
+        tipPercent: { type: 'number' },
+        people: { type: 'number' },
+      }),
+    },
+    async run({ expression, amount, tipPercent, people }) {
+      if (amount != null) return tipSplit({ amount, tipPercent, people })
+      return { result: fmt(evaluate(String(expression ?? ''))) }
+    },
+  },
+
+  convert_units: {
+    declaration: {
+      name: 'convert_units',
+      description: 'Convert length, weight, volume, cooking measures, speed, area, data size, time or temperature.',
+      parameters: obj({ value: { type: 'number' }, from: str('Unit, e.g. "miles", "lb", "cups", "fahrenheit"'), to: str('Unit') }, ['value', 'from', 'to']),
+    },
+    run: async (args) => convertUnits(args),
+  },
+
+  transit_departures: {
+    declaration: {
+      name: 'transit_departures',
+      description: 'Next buses, trains, trams, tubes or ferries from the stations nearest the user (timetable, real-time where available).',
+      parameters: obj({ stop: str('Optional stop or station name nearby'), mode: str('Optional: bus, rail, subway, tram, ferry') }),
+    },
+    async run({ stop, mode }, { locator }) {
+      const fix = await locator.get(60_000)
+      if (!fix || fix.source === 'home') return { error: 'I need the phone location for nearby departures.' }
+      return departures(fix, { stop, mode })
+    },
+  },
+
+  sports_scores: {
+    declaration: {
+      name: 'sports_scores',
+      description: "Live and today's scores and fixtures for a league, optionally one team. For other sports or older results use web_search.",
+      parameters: obj({ league: { type: 'string', enum: Object.keys(LEAGUES) }, team: str('Team name, e.g. "Arsenal"') }, ['league']),
+    },
+    run: (args) => scores(args),
+  },
+
+  crypto_price: {
+    declaration: {
+      name: 'crypto_price',
+      description: 'Current price and 24 hour change of a cryptocurrency. For stocks use web_search.',
+      parameters: obj({ coin: str('e.g. bitcoin, ETH'), currency: str('ISO code, default USD') }, ['coin']),
+    },
+    run: (args) => cryptoPrice(args),
+  },
+
+  navigate: view(
+    'navigate',
+    'Walking directions on the glasses: a route map with turn-by-turn arrows. Give a place or address, or a category for the nearest one.',
+    ({ destination, category }) => ({ type: 'navigate', query: destination, category: RADAR_CATEGORIES[category] ? category : undefined }),
+    obj({ destination: str('Place name or address'), category: { type: 'string', enum: Object.keys(RADAR_CATEGORIES) } }),
+  ),
+
+  start_guide: view(
+    'start_guide',
+    'Step-by-step recipe or how-to on the glasses, one step per screen; steps with a duration offer a one-press timer. ' +
+      'Omit topic to use the recipe pasted in the phone app.',
+    ({ topic }) => ({ type: 'guide', topic: topic || undefined }),
+    obj({ topic: str('What to make or do, with any detail the user gave, e.g. "pancakes for 4"') }),
+  ),
+
+  add_to_list: {
+    declaration: {
+      name: 'add_to_list',
+      description: 'Add items to a checklist (shopping, packing, to-do...). Creates the list if needed.',
+      parameters: obj({ list: str('List name, e.g. "shopping"'), items: { type: 'array', items: { type: 'string' } } }, ['list', 'items']),
+    },
+    async run({ list, items }, { lists }) {
+      return lists.add(list, Array.isArray(items) ? items.map(String) : [String(items)])
+    },
+  },
+
+  get_lists: {
+    declaration: { name: 'get_lists', description: 'All checklists and their items with done state.', parameters: obj({}) },
+    async run(_args, { lists }) {
+      const all = lists.all
+      return all.length ? all.map((l) => ({ list: l.name, items: l.items.map((i) => `${i.done ? '[x]' : '[ ]'} ${i.text}`) })) : { lists: [] }
+    },
+  },
+
+  show_list: view(
+    'show_list',
+    'Open a checklist on the glasses to tick items off with the ring.',
+    ({ list }) => ({ type: 'list', name: String(list ?? '') }),
+    obj({ list: str('List name') }, ['list']),
+  ),
+
+  update_list_item: {
+    declaration: {
+      name: 'update_list_item',
+      description: 'Tick off, untick or remove an item on a list.',
+      parameters: obj({ list: str('List name'), item: str('Item text'), action: { type: 'string', enum: ['done', 'undone', 'remove'] } }, ['list', 'item', 'action']),
+    },
+    async run({ list, item, action }, { lists }) {
+      const l = lists.find(list)
+      if (!l) return { error: `No list called ${list}.` }
+      const it = lists.item(l, item)
+      if (!it) return { error: `No "${item}" on the ${l.name} list.` }
+      if (action === 'remove') return { removed: await lists.removeItem(l.id, it.id), item: it.text }
+      return { updated: await lists.setDone(l.id, it.id, action === 'done'), item: it.text, done: action === 'done' }
+    },
+  },
+
+  clear_list: {
+    declaration: {
+      name: 'clear_list',
+      description: 'Remove ticked items from a list, or delete the whole list.',
+      parameters: obj({ list: str('List name'), everything: { type: 'boolean', description: 'true deletes all items' } }, ['list']),
+    },
+    async run({ list, everything }, { lists }) {
+      const l = lists.find(list)
+      if (!l) return { error: `No list called ${list}.` }
+      return { removed: await lists.clear(l.id, !everything), list: l.name }
+    },
+  },
+
+  start_activity: view(
+    'start_activity',
+    'Track a walk, run or bike ride with GPS: time, distance and pace on the glasses, saved to notes when finished.',
+    ({ kind }) => ({ type: 'activity', kind: ACTIVITIES.includes(kind) ? kind : 'walk' }),
+    obj({ kind: { type: 'string', enum: [...ACTIVITIES] } }, ['kind']),
+  ),
+
+  suit_diagnostics: view(
+    'suit_diagnostics',
+    'Show system diagnostics: glasses and phone battery, network, location, voice quota, hands-free state.',
+    () => ({ type: 'diagnostics' }),
+  ),
+
+  set_hands_free: view(
+    'set_hands_free',
+    'Turn the "Hey EDITH" wake word on or off.',
+    ({ on }) => ({ type: 'handsfree', on: !!on }),
+    obj({ on: { type: 'boolean' } }, ['on']),
+  ),
+
+  set_personality: view(
+    'set_personality',
+    'Switch the assistant personality: edith (dry, tactical), friday (warm, Irish), jarvis (formal, British butler).',
+    ({ name }) => ({ type: 'persona', id: PERSONA_IDS.includes(name) ? name : 'edith' }),
+    obj({ name: { type: 'string', enum: PERSONA_IDS } }, ['name']),
+  ),
+
+  sync_calendar: {
+    declaration: { name: 'sync_calendar', description: 'Refresh events from Google Calendar now.', parameters: obj({}) },
+    async run(_args, { calendar }) {
+      const n = await calendar.sync(true)
+      return n < 0 ? { error: 'Google Calendar is not linked. Set it up in the phone app.' } : { events: n }
+    },
   },
 
   remember: {
@@ -242,11 +454,16 @@ const tools: Record<string, Tool> = {
   add_event: {
     declaration: {
       name: 'add_event',
-      description: "Add an event to the user's EDITH calendar (stored on the phone).",
+      description: "Add an event to the user's calendar (their Google Calendar when linked, else the phone).",
       parameters: obj({ title: str('Event title'), start: TIME, end: TIME }, ['title', 'start']),
     },
-    async run({ title, start, end }, { agenda }) {
-      const e = await agenda.addEvent(title, parseTime(start), end ? parseTime(end) : undefined)
+    async run({ title, start, end }, { agenda, calendar }) {
+      const [a, b] = [parseTime(start), end ? parseTime(end) : undefined]
+      if (await calendar.linked()) {
+        await calendar.create(title, a, b)
+        return { saved: title, start: localIso(a), calendar: 'Google' }
+      }
+      const e = await agenda.addEvent(title, a, b)
       return { saved: e.title, start: localIso(e.start), end: e.end ? localIso(e.end) : undefined }
     },
   },
@@ -262,7 +479,7 @@ const tools: Record<string, Tool> = {
       const b = to ? parseTime(to) : Date.now() + 7 * 86400_000
       return agenda.events
         .filter((e) => e.start >= a && e.start <= b)
-        .map((e) => ({ id: e.id, title: e.title, start: localIso(e.start), end: e.end ? localIso(e.end) : undefined }))
+        .map((e) => ({ id: e.id, title: e.title, start: localIso(e.start), end: e.end ? localIso(e.end) : undefined, allDay: e.allDay, google: e.source === 'google' }))
     },
   },
 
@@ -273,6 +490,7 @@ const tools: Record<string, Tool> = {
       parameters: obj({ id: str('Event id') }, ['id']),
     },
     async run({ id }, { agenda }) {
+      if (String(id).startsWith('g:')) return { error: 'That event is in Google Calendar; delete it there.' }
       return { deleted: await agenda.remove('events', [id]) }
     },
   },
@@ -307,6 +525,8 @@ const tools: Record<string, Tool> = {
     },
   },
 }
+
+const clockOf = (ms: number) => new Date(ms).toTimeString().slice(0, 5)
 
 export const declarations = Object.values(tools).map((t) => t.declaration)
 

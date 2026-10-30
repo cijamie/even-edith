@@ -1,4 +1,5 @@
 import type { Settings } from '../settings'
+import { PERSONA_IDS, PERSONAS } from '../persona'
 
 type Pref = {
   id: string
@@ -10,7 +11,7 @@ type Pref = {
   set: (v: string) => Promise<void>
 }
 
-/** Home city (weather, map fallback) and the daily briefing time. */
+/** Personality, hands-free, home city (weather, map fallback) and the daily briefing time. */
 export async function mountPrefs(root: HTMLElement, settings: Settings, onChange: () => void) {
   const prefs: Pref[] = [
     {
@@ -32,6 +33,42 @@ export async function mountPrefs(root: HTMLElement, settings: Settings, onChange
       set: (v) => settings.setBriefingTime(v),
     },
   ]
+
+  // Personality and hands-free apply instantly, no Save button.
+  const extra = document.createElement('div')
+  extra.innerHTML = `
+    <div class="key">
+      <div class="key-head"><label for="persona">Personality</label></div>
+      <div class="field">
+        <select id="persona">
+          ${PERSONA_IDS.map((id) => `<option value="${id}">${PERSONAS[id].name}</option>`).join('')}
+        </select>
+      </div>
+    </div>
+    <div class="key">
+      <div class="key-head">
+        <label for="handsfree">Hands-free ("Hey EDITH")</label>
+        <input id="handsfree" type="checkbox" class="toggle" />
+      </div>
+      <p class="hint">
+        Keeps the glasses mic on while EDITH is open and listens for her name, so it uses more battery.
+        Each phrase you say is sent to Groq to check for the name (speech the app tags as someone else is skipped),
+        which counts against Groq's free daily quota. Works only while the app is open on the glasses.
+      </p>
+    </div>`
+  root.append(extra)
+  const select = extra.querySelector<HTMLSelectElement>('#persona')!
+  select.value = (await settings.persona()) || 'edith'
+  select.addEventListener('change', async () => {
+    await settings.setPersona(select.value)
+    onChange()
+  })
+  const toggle = extra.querySelector<HTMLInputElement>('#handsfree')!
+  toggle.checked = await settings.handsFree()
+  toggle.addEventListener('change', async () => {
+    await settings.setHandsFree(toggle.checked)
+    onChange()
+  })
 
   for (const p of prefs) {
     const row = document.createElement('div')

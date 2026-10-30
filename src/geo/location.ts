@@ -23,6 +23,45 @@ export class Locator {
     return fix
   }
 
+  /**
+   * Continuous fixes for navigation and activity tracking: the phone's location
+   * stream when the Even app provides one, else polling every few seconds.
+   * Returns a function that stops it.
+   */
+  watch(onFix: (fix: Fix) => void): () => void {
+    let stopped = false
+    let lastPush = 0
+    const emit = (fix: Fix) => {
+      if (stopped) return
+      this.last = { fix, at: Date.now() }
+      onFix(fix)
+    }
+    const unsubscribe = this.bridge.onAppLocationChanged((loc) => {
+      if (!loc || !Number.isFinite(loc.latitude) || (loc.latitude === 0 && loc.longitude === 0)) return
+      lastPush = Date.now()
+      const heading = loc.heading != null && loc.heading >= 0 ? loc.heading : undefined
+      emit({ lat: loc.latitude, lon: loc.longitude, accuracy: loc.accuracy, heading, source: 'phone' })
+    })
+    void this.bridge
+      .startAppLocationUpdates({ accuracy: AppLocationAccuracy.High, intervalMs: 2000, distanceFilter: 3 })
+      .catch(() => false)
+    // Fallback poll, used only while the stream is quiet.
+    let polling = false
+    const poll = setInterval(async () => {
+      if (polling || Date.now() - lastPush < 6000) return
+      polling = true
+      const fix = await this.get(0)
+      polling = false
+      if (fix && fix.source !== 'home') emit(fix)
+    }, 4000)
+    return () => {
+      stopped = true
+      clearInterval(poll)
+      unsubscribe()
+      void this.bridge.stopAppLocationUpdates().catch(() => false)
+    }
+  }
+
   private async fromPhone(): Promise<Fix | null> {
     try {
       const loc = await Promise.race([

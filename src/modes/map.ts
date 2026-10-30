@@ -2,13 +2,13 @@ import { GLYPHS, ID } from '../hud/layout'
 import { paginate } from '../hud/paginate'
 import { compass, coords, describePlace, distanceBearing, metres, type Fix } from '../geo/location'
 import { halves, renderMap, renderRadar, type Blip } from '../geo/render'
-import { requestJson } from '../net/http'
+import { nearby } from '../geo/places'
 import type { Host, Mode } from './mode'
 
-const MAP_CHROME = { [ID.tr]: GLYPHS.tr, [ID.br]: GLYPHS.br }
+export const MAP_CHROME = { [ID.tr]: GLYPHS.tr, [ID.br]: GLYPHS.br }
 const SOURCE_LABEL: Record<Fix['source'], string> = { phone: 'PHONE GPS', browser: 'BROWSER', home: 'HOME CITY' }
 
-async function draw(host: Host, canvas: HTMLCanvasElement) {
+export async function draw(host: Host, canvas: HTMLCanvasElement) {
   const [top, bottom] = await halves(canvas)
   // Send both halves even if one is rejected, so a glitch costs half the map, not all of it.
   const ok = [await host.display.image(ID.mapTop, top), await host.display.image(ID.mapBottom, bottom)]
@@ -130,25 +130,8 @@ export class RadarMode implements Mode {
   }
 
   private async search(fix: Fix): Promise<Place[]> {
-    const q = this.category.replace('_', ' ')
-    // Reverse lookup filters by type and distance; a text search would only
-    // match places with the category word in their name.
-    const r = await requestJson<any>(
-      `https://photon.komoot.io/reverse?limit=25&radius=2&lang=en&lat=${fix.lat}&lon=${fix.lon}` +
-        `&osm_tag=${encodeURIComponent(this.osmTag)}`,
-      {},
-      10000,
-    )
-    return (r.features ?? [])
-      .map((f: any) => {
-        const [lon, lat] = f.geometry.coordinates
-        const { distance, bearing } = distanceBearing(fix.lat, fix.lon, lat, lon)
-        // Short enough that "name · 130m SE" fits one line of the side panel.
-        const name = String(f.properties.name ?? q)
-        return { name: name.length > 17 ? name.slice(0, 16).trimEnd() + '.' : name, distance, bearing }
-      })
-      .filter((p: Place) => p.distance <= 2000)
-      .sort((a: Place, b: Place) => a.distance - b.distance)
-      .slice(0, 9)
+    const places = await nearby(fix, this.osmTag, this.category.replace('_', ' '))
+    // Short enough that "name · 130m SE" fits one line of the side panel.
+    return places.slice(0, 9).map((p) => ({ ...p, name: p.name.length > 17 ? p.name.slice(0, 16).trimEnd() + '.' : p.name }))
   }
 }
