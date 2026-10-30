@@ -3,7 +3,7 @@
 #   ./scripts/sim-shots.ps1 -Out $env:TEMP\shots -Steps 'shot:boot','wait:2500','click','wait:800','shot:typing'
 param(
   [string[]]$Steps,
-  [string]$Out = "$env:TEMP\jarvis-shots",
+  [string]$Out = "$env:TEMP\edith-shots",
   [string]$Api = 'http://127.0.0.1:9898'
 )
 New-Item -ItemType Directory -Force $Out | Out-Null

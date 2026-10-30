@@ -128,7 +128,7 @@ const tools: Record<string, Tool> = {
   add_event: {
     declaration: {
       name: 'add_event',
-      description: "Add an event to the user's Jarvis calendar (stored on the phone).",
+      description: "Add an event to the user's EDITH calendar (stored on the phone).",
       parameters: obj({ title: str('Event title'), start: TIME, end: TIME }, ['title', 'start']),
     },
     async run({ title, start, end }, { agenda }) {

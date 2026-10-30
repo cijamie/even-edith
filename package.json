@@ -1,5 +1,5 @@
 {
-  "name": "even-jarvis",
+  "name": "even-edith",
   "private": true,
   "version": "0.2.0",
   "type": "module",
@@ -8,7 +8,7 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview --host",
     "sim": "evenhub-simulator http://localhost:5173",
-    "pack": "npm run build && evenhub pack app.json dist -o even-jarvis.ehpk"
+    "pack": "npm run build && evenhub pack app.json dist -o even-edith.ehpk"
   },
   "dependencies": {
     "@evenrealities/even_hub_sdk": "^0.0.16"

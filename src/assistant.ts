@@ -15,7 +15,7 @@ import type { Settings } from './settings'
 type State = 'idle' | 'listening' | 'thinking'
 type View = 'answer' | 'dashboard'
 
-const BANNER = 'J.A.R.V.I.S // ONLINE'
+const BANNER = 'E.D.I.T.H. // ONLINE'
 const IDLE_HINT = 'HOLD · TALK'
 
 // Handled locally so the dashboard opens instantly, without a round trip to Gemini.
@@ -90,7 +90,7 @@ export class Assistant {
     }
   }
 
-  /** Show a message as Jarvis's reply (also used for the boot greeting and errors). */
+  /** Show a message as EDITH's reply (also used for the boot greeting and errors). */
   async say(text: string) {
     this.view = 'answer'
     this.pages = paginate(text)
@@ -121,7 +121,7 @@ export class Assistant {
   /** Once a second: fire due alerts, and keep the dashboard's clock and timers live. */
   private async tick() {
     const due = await this.agenda.takeDue()
-    for (const t of due.timers) this.alerts.push(`Your ${t.label === 'timer' ? '' : t.label + ' '}timer is done, sir.`)
+    for (const t of due.timers) this.alerts.push(`Your ${t.label === 'timer' ? '' : t.label + ' '}timer is done.`)
     for (const r of due.reminders) this.alerts.push(`Reminder: ${r.text}`)
     if (this.alerts.length && this.state === 'idle' && !this.typing && !this.alerting) {
       void this.showAlerts()
@@ -274,14 +274,14 @@ export class Assistant {
   }
 }
 
-/** Lowercase, no punctuation, and no leading "Jarvis," so "Jarvis, open dashboard." matches. */
+/** Lowercase, no punctuation, and no leading "EDITH," so "EDITH, open dashboard." matches. */
 const normalise = (s: string) =>
   s
     .toLowerCase()
     .replace(/[^\p{L}\p{N}\s]/gu, ' ')
     .replace(/\s+/g, ' ')
     .trim()
-    .replace(/^(?:hey |ok |okay )?jarvis\s*/, '')
+    .replace(/^(?:hey |ok |okay )?(?:edith|edit|jarvis)\s*/, '')
 
 /** Dry, in-character error lines that still say what to fix. */
 function explain(err: unknown, service: string): string {

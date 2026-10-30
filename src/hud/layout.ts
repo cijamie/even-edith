@@ -1,9 +1,11 @@
 import {
   CreateStartUpPageContainer,
+  ImageContainerProperty,
   RebuildPageContainer,
   TextContainerProperty,
   type EvenAppBridge,
 } from '@evenrealities/even_hub_sdk'
+import { REACTOR_SIZE } from './reactor'
 
 // Canvas is 576x288. Text brightness is 0-4 (SDK limit), so "dim chrome"
 // uses CHROME and content uses BRIGHT.
@@ -32,7 +34,10 @@ export const ID = {
   header: 5,
   body: 6,
   footer: 7,
+  reactor: 8,
 } as const
+
+export const REACTOR = { name: 'reactor', x: 216, y: 38 }
 
 export const NAMES: Record<number, string> = {
   [ID.tl]: 'tl',
@@ -77,23 +82,51 @@ function text(
   })
 }
 
-/** Creates the HUD page with every container blank; the boot sequence fills it. */
-export async function createHud(bridge: EvenAppBridge) {
-  const page = {
-    containerTotalNum: 7,
+/** Initial text per container, for rebuilding the page without losing what's on screen. */
+export type HudContent = Partial<Record<number, string>>
+
+function hudPage(withReactor: boolean, content: HudContent = {}) {
+  const c = (id: number) => ({ content: content[id] || ' ' })
+  return {
+    containerTotalNum: withReactor ? 8 : 7,
+    // Boot-animation canvas, centred over the body. Only present during boot:
+    // even an all-black image hides the text behind it.
+    imageObject: withReactor
+      ? [
+          new ImageContainerProperty({
+            containerID: ID.reactor,
+            containerName: REACTOR.name,
+            xPosition: REACTOR.x,
+            yPosition: REACTOR.y,
+            width: REACTOR_SIZE,
+            height: REACTOR_SIZE,
+          }),
+        ]
+      : [],
     textObject: [
-      text(ID.tl, 0, 0, CORNER_W, ROW_H, CHROME),
-      text(ID.tr, 576 - CORNER_W_RIGHT, 0, CORNER_W_RIGHT, ROW_H, CHROME),
-      text(ID.bl, 0, BOTTOM_Y, CORNER_W, ROW_H, CHROME),
-      text(ID.br, 576 - CORNER_W_RIGHT, BOTTOM_Y, CORNER_W_RIGHT, ROW_H, CHROME),
-      text(ID.header, CORNER_W + 8, 0, 576 - 2 * (CORNER_W + 8), ROW_H, CHROME),
+      text(ID.tl, 0, 0, CORNER_W, ROW_H, CHROME, c(ID.tl)),
+      text(ID.tr, 576 - CORNER_W_RIGHT, 0, CORNER_W_RIGHT, ROW_H, CHROME, c(ID.tr)),
+      text(ID.bl, 0, BOTTOM_Y, CORNER_W, ROW_H, CHROME, c(ID.bl)),
+      text(ID.br, 576 - CORNER_W_RIGHT, BOTTOM_Y, CORNER_W_RIGHT, ROW_H, CHROME, c(ID.br)),
+      text(ID.header, CORNER_W + 8, 0, 576 - 2 * (CORNER_W + 8), ROW_H, CHROME, c(ID.header)),
       text(ID.body, 12, ROW_H + 4, 552, BOTTOM_Y - ROW_H - 8, BRIGHT, {
         paddingLength: 4,
         isEventCapture: 1,
+        ...c(ID.body),
       }),
-      text(ID.footer, CORNER_W + 8, BOTTOM_Y, 576 - 2 * (CORNER_W + 8), ROW_H, CHROME),
+      text(ID.footer, CORNER_W + 8, BOTTOM_Y, 576 - 2 * (CORNER_W + 8), ROW_H, CHROME, c(ID.footer)),
     ],
   }
+}
+
+/** Drops the reactor image once boot is done, keeping the given text on screen. */
+export async function removeReactor(bridge: EvenAppBridge, content: HudContent) {
+  return bridge.rebuildPageContainer(new RebuildPageContainer(hudPage(false, content)))
+}
+
+/** Creates the HUD page (with the boot reactor) and every container blank; the boot sequence fills it. */
+export async function createHud(bridge: EvenAppBridge) {
+  const page = hudPage(true)
   const result = await bridge.createStartUpPageContainer(new CreateStartUpPageContainer(page))
   if (result === 0) return
   // The startup page can only be created once per launch. After a WebView

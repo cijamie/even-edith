@@ -7,7 +7,7 @@ export type Note = { id: string; text: string; createdAt: number }
 
 type Data = { timers: Timer[]; reminders: Reminder[]; events: CalEvent[]; notes: Note[] }
 
-const KEY = 'jarvis.agenda'
+const KEY = 'edith.agenda'
 const shortId = () => Math.random().toString(36).slice(2, 7)
 
 /**

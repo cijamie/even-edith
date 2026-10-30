@@ -3,10 +3,10 @@ import type { Store } from './store'
 export type KeyName = 'gemini' | 'groq'
 
 const STORAGE_KEY: Record<KeyName, string> = {
-  gemini: 'jarvis.geminiKey',
-  groq: 'jarvis.groqKey',
+  gemini: 'edith.geminiKey',
+  groq: 'edith.groqKey',
 }
-const HOME_CITY = 'jarvis.homeCity'
+const HOME_CITY = 'edith.homeCity'
 
 // Format checks only; whether a key actually works is tested in the CORS screen.
 const PATTERN: Record<KeyName, RegExp> = {

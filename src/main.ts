@@ -16,6 +16,12 @@ const status = document.getElementById('status')!
 
 const bridge = await waitForEvenAppBridge()
 const store = new Store(bridge)
+await store.migrate({
+  'jarvis.geminiKey': 'edith.geminiKey',
+  'jarvis.groqKey': 'edith.groqKey',
+  'jarvis.homeCity': 'edith.homeCity',
+  'jarvis.agenda': 'edith.agenda',
+})
 const settings = new Settings(store)
 const agenda = new Agenda(store)
 await agenda.load()
@@ -41,17 +47,17 @@ if (new URLSearchParams(location.search).has('probe')) {
 async function greeting() {
   const keys = await settings.all()
   const missing = [!keys.groq && 'Groq', !keys.gemini && 'Gemini'].filter(Boolean)
-  if (!missing.length) return 'At your service. Hold to speak.'
+  if (!missing.length) return 'All systems nominal. Hold to speak.'
   const [noun, pronoun] = missing.length > 1 ? ['keys', 'them'] : ['key', 'it']
-  return `I appear to be missing my ${missing.join(' and ')} ${noun}, sir. Open Even Jarvis on your phone to add ${pronoun}.`
+  return `I'm missing my ${missing.join(' and ')} ${noun}. Open Even EDITH on your phone to add ${pronoun}.`
 }
 
 async function startHud(bridge: EvenAppBridge) {
   await createHud(bridge)
   const display = new Display(bridge, NAMES)
   const assistant = new Assistant(bridge, display, settings, agenda)
-  // Dev hook: drive the assistant by text from the console, e.g. jarvis.handleText('open dashboard').
-  if (import.meta.env.DEV) Object.assign(window, { jarvis: assistant })
+  // Dev hook: drive the assistant by text from the console, e.g. edith.handleText('open dashboard').
+  if (import.meta.env.DEV) Object.assign(window, { edith: assistant })
 
   let ready = false
   bridge.onEvenHubEvent((event) => {
@@ -63,6 +69,7 @@ async function startHud(bridge: EvenAppBridge) {
 
   const keys = await settings.all()
   await boot(
+    bridge,
     display,
     [
       { label: 'CORE SYSTEMS', ok: true },
