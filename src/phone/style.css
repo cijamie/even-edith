@@ -1,0 +1,169 @@
+:root {
+  --bg: #050806;
+  --panel: #0b120d;
+  --line: #1d3324;
+  --text: #d5f5dc;
+  --dim: #7fa58a;
+  --accent: #39ff6a;
+  --warn: #ffcc4d;
+  --bad: #ff6b6b;
+  --mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 16px/1.45 -apple-system, system-ui, sans-serif;
+  -webkit-text-size-adjust: 100%;
+}
+
+#phone {
+  max-width: 560px;
+  margin: 0 auto;
+  padding: max(20px, env(safe-area-inset-top)) 16px max(32px, env(safe-area-inset-bottom));
+}
+
+.masthead h1 {
+  margin: 0;
+  font: 600 22px/1.2 var(--mono);
+  letter-spacing: 0.18em;
+  color: var(--accent);
+}
+
+.status {
+  margin: 4px 0 20px;
+  font: 13px var(--mono);
+  color: var(--dim);
+}
+
+.card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.card h2 {
+  margin: 0 0 4px;
+  font: 600 13px var(--mono);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--dim);
+}
+
+.hint {
+  margin: 0 0 16px;
+  font-size: 14px;
+  color: var(--dim);
+}
+
+.key {
+  padding: 14px 0;
+  border-top: 1px solid var(--line);
+}
+
+.key-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.key-head label {
+  font-weight: 600;
+}
+
+.badge {
+  font: 12px var(--mono);
+  color: var(--dim);
+  white-space: nowrap;
+}
+
+.badge.ok {
+  color: var(--accent);
+}
+
+.badge.warn {
+  color: var(--warn);
+}
+
+.field {
+  display: flex;
+  gap: 8px;
+}
+
+.field input {
+  flex: 1;
+  min-width: 0;
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--bg);
+  color: var(--text);
+  font: 15px var(--mono);
+}
+
+.field input:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+}
+
+button {
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--text);
+  font: 600 14px -apple-system, system-ui, sans-serif;
+  cursor: pointer;
+}
+
+button.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #03140a;
+}
+
+button:disabled {
+  opacity: 0.4;
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.where {
+  margin: 8px 0 0;
+  font-size: 13px;
+  color: var(--dim);
+}
+
+.where code {
+  font: 13px var(--mono);
+  color: var(--text);
+  user-select: all;
+  -webkit-user-select: all;
+}
+
+.msg {
+  min-height: 1.2em;
+  margin: 6px 0 0;
+  font-size: 13px;
+}
+
+.msg.warn {
+  color: var(--warn);
+}
+
+.msg.ok {
+  color: var(--accent);
+}

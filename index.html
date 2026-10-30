@@ -2,14 +2,25 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="color-scheme" content="dark" />
     <title>Even Jarvis</title>
   </head>
   <body>
-    <!-- Phone-side UI (settings, CORS test) lands here in later steps. -->
     <main id="phone">
-      <h1>EVEN JARVIS</h1>
-      <p id="status">Waiting for glasses bridge…</p>
+      <header class="masthead">
+        <h1>EVEN JARVIS</h1>
+        <p id="status" class="status">Connecting to glasses…</p>
+      </header>
+
+      <section class="card" aria-labelledby="keys-title">
+        <h2 id="keys-title">API keys</h2>
+        <p class="hint">
+          Your keys stay on this phone and are sent only to Google and Groq.
+          Both have free tiers.
+        </p>
+        <div id="keys"></div>
+      </section>
     </main>
     <script type="module" src="./src/main.ts"></script>
   </body>
