@@ -1,0 +1,24 @@
+{
+  "package_id": "com.cijamie.evenjarvis",
+  "edition": "202601",
+  "name": "Even Jarvis",
+  "version": "0.1.0",
+  "min_sdk_version": "0.0.16",
+  "entrypoint": "index.html",
+  "permissions": [
+    {
+      "name": "network",
+      "desc": "Sends your voice to Groq for transcription, your question to Google Gemini for an answer, and fetches weather from Open-Meteo.",
+      "whitelist": [
+        "https://api.groq.com",
+        "https://generativelanguage.googleapis.com",
+        "https://api.open-meteo.com"
+      ]
+    },
+    {
+      "name": "g2-microphone",
+      "desc": "Records your voice from the glasses microphones while you hold the ring or touchpad to talk."
+    }
+  ],
+  "supported_languages": ["en"]
+}
