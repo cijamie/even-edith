@@ -45,6 +45,33 @@ export class Settings {
     return this.store.set(HOME_CITY, city)
   }
 
+  /** Street address for "take me home"; the home city is too coarse to route to. */
+  homeAddress(): Promise<string> {
+    return this.store.get('edith.homeAddress')
+  }
+
+  setHomeAddress(address: string): Promise<void> {
+    return this.store.set('edith.homeAddress', address)
+  }
+
+  /** ntfy.sh topic that phone automations post notifications to, or '' for off. */
+  relayTopic(): Promise<string> {
+    return this.store.get('edith.relayTopic')
+  }
+
+  setRelayTopic(topic: string): Promise<void> {
+    return this.store.set('edith.relayTopic', topic)
+  }
+
+  /** Proactive alerts (rain, places, shopping list); on unless turned off. */
+  async proactive(): Promise<boolean> {
+    return (await this.store.get('edith.proactive')) !== 'off'
+  }
+
+  setProactive(on: boolean): Promise<void> {
+    return this.store.set('edith.proactive', on ? 'on' : 'off')
+  }
+
   /** "HH:MM" for the daily briefing, or '' for off. */
   briefingTime(): Promise<string> {
     return this.store.get('edith.briefingTime')

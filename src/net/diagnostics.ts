@@ -214,6 +214,42 @@ export const CHECKS: Check[] = [
     },
   },
   {
+    id: 'air',
+    label: 'Air quality (Open-Meteo)',
+    async run() {
+      const r = await call('https://air-quality-api.open-meteo.com/v1/air-quality?latitude=51.51&longitude=-0.13&current=european_aqi')
+      return r.ok ? { ...r, detail: `London AQI ${r.body?.current?.european_aqi}.` } : r
+    },
+  },
+  {
+    id: 'routing',
+    label: 'Walking routes (OSRM)',
+    async run() {
+      const r = await call('https://routing.openstreetmap.de/routed-foot/route/v1/foot/-0.1276,51.5072;-0.1200,51.5100?overview=false')
+      return r.ok ? { ...r, detail: `Route ${Math.round(r.body?.routes?.[0]?.distance ?? 0)} m.` } : r
+    },
+  },
+  {
+    id: 'news',
+    label: 'News (Hacker News)',
+    async run() {
+      const r = await call('https://hn.algolia.com/api/v1/search?tags=front_page&hitsPerPage=1')
+      return r.ok ? { ...r, detail: String(r.body?.hits?.[0]?.title ?? 'Answered.').slice(0, 60) } : r
+    },
+  },
+  {
+    id: 'relay',
+    label: 'Notification relay (ntfy.sh)',
+    async run() {
+      try {
+        const res = await fetch('https://ntfy.sh/edith-diagnostics/json?poll=1&since=1m', { signal: AbortSignal.timeout(10000) })
+        return { ok: res.ok, verdict: res.ok ? 'OK' : `HTTP ${res.status}`, detail: 'Reachable.' }
+      } catch {
+        return { ok: false, verdict: 'BLOCKED', detail: 'No readable response: CORS, whitelist or network.' }
+      }
+    },
+  },
+  {
     id: 'location',
     label: 'Phone location',
     async run() {

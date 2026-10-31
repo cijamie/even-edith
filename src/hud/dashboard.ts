@@ -1,5 +1,7 @@
 import type { Agenda } from '../data/agenda'
+import type { Flashcards } from '../data/flashcards'
 import type { Settings } from '../settings'
+import { getNews } from '../tools/news'
 import { getWeather } from '../tools/weather'
 import { clock, countdown, dayLabel, isSameDay } from '../util/time'
 
@@ -14,6 +16,7 @@ export class Dashboard {
 
   constructor(
     private agenda: Agenda,
+    private flashcards: Flashcards,
     private settings: Settings,
     /** e.g. "G2 82% · CHARGING", or '' when unknown. */
     private status: () => string = () => '',
@@ -21,7 +24,7 @@ export class Dashboard {
 
   /** Spoken-style morning briefing from the same data as the dashboard. */
   async briefing(now = Date.now()): Promise<string> {
-    await this.refreshWeather()
+    const [, news] = await Promise.all([this.refreshWeather(), getNews({ topic: 'world' }).catch(() => null)])
     const hour = new Date(now).getHours()
     const parts = [hour < 12 ? 'Good morning.' : hour < 18 ? 'Good afternoon.' : 'Good evening.']
     const w = this.weather?.data
@@ -31,6 +34,10 @@ export class Dashboard {
         `${this.weather!.city}: ${r(w.now.temperatureC)}° and ${w.now.conditions}, high ${r(w.today.highC)}°, ` +
           `${r(w.today.chanceOfRainPct)}% chance of rain.`,
       )
+      if (w.sun.sunset) parts.push(`Sunset ${w.sun.sunset}.`)
+      const air = w.airQuality
+      if (air && air.europeanAqi != null && air.europeanAqi > 40) parts.push(`Air quality is ${air.rating}.`)
+      if ((w.today.uvIndexMax ?? 0) >= 6) parts.push(`UV peaks at ${Math.round(w.today.uvIndexMax!)}; sunscreen advised.`)
     }
     const today = this.agenda.events.filter((e) => isSameDay(e.start, now) && e.start >= now - 3600_000)
     parts.push(
@@ -41,6 +48,12 @@ export class Dashboard {
     const rem = this.agenda.reminders.filter((r) => isSameDay(r.at, now))
     if (rem.length) parts.push(`${rem.length} reminder${rem.length > 1 ? 's' : ''} today.`)
     if (this.agenda.timers.length) parts.push(`${this.agenda.timers.length} timer${this.agenda.timers.length > 1 ? 's' : ''} running.`)
+    const shopping = this.agenda.list('shopping')?.items.filter((i) => !i.done).length ?? 0
+    if (shopping) parts.push(`${shopping} item${shopping > 1 ? 's' : ''} on the shopping list.`)
+    const due = this.flashcards.decks().reduce((n, d) => n + d.due, 0)
+    if (due) parts.push(`${due} flashcard${due > 1 ? 's' : ''} due.`)
+    const top = news && 'headlines' in news ? news.headlines?.[0] : undefined
+    if (top) parts.push(`In the news: ${top.title}`)
     const s = this.status()
     if (s) parts.push(`Glasses: ${s.replace(/^G2 /, '').toLowerCase()}.`)
     return parts.join(' ')
@@ -68,6 +81,8 @@ export class Dashboard {
 
   render(now = Date.now()): string {
     const lines = [`${dayLabel(now)} · ${clock(now)}`, this.weather?.line ?? 'WEATHER · ...']
+    const sky = skyLine(this.weather?.data)
+    if (sky) lines.push(sky)
     const status = this.status()
     if (status) lines.push(status)
 
@@ -84,14 +99,21 @@ export class Dashboard {
         .map((e) => ({ at: e.start, line: `CAL ${when(e.start)} · ${e.title}` })),
       ...this.agenda.reminders
         .filter((r) => r.at <= horizon)
-        .map((r) => ({ at: r.at, line: `REM ${when(r.at)} · ${r.text}` })),
+        .map((r) => ({ at: r.at, line: `REM ${when(r.at)} · ${r.text}${r.repeat ? ` (${r.repeat.toUpperCase()})` : ''}` })),
     ].sort((a, b) => a.at - b.at)
     lines.push(...items.map((i) => i.line))
+
+    for (const l of this.agenda.lists) {
+      const open = l.items.filter((i) => !i.done).length
+      if (open) lines.push(`LIST ${l.name.toUpperCase()} · ${open} OPEN`)
+    }
+    const due = this.flashcards.decks().reduce((n, d) => n + d.due, 0)
+    if (due) lines.push(`CARDS · ${due} DUE`)
 
     const note = this.agenda.notes[0]
     if (note) lines.push(`NOTE · ${note.text}`)
 
-    if (lines.length === (status ? 3 : 2)) lines.push('Nothing scheduled. A rare luxury.')
+    if (lines.length === 2 + (sky ? 1 : 0) + (status ? 1 : 0)) lines.push('Nothing scheduled. A rare luxury.')
     return lines.join('\n')
   }
 }
@@ -103,4 +125,12 @@ function weatherLine(city: string, w: Weather): string {
     `${city.toUpperCase()} ${round(w.now.temperatureC)}° · ${w.now.conditions.toUpperCase()}` +
     ` · H${round(w.today.highC)}° L${round(w.today.lowC)}° · RAIN ${round(w.today.chanceOfRainPct)}%`
   )
+}
+
+/** "SUNRISE 06:58 · SUNSET 16:35 · AIR GOOD" */
+function skyLine(w?: Weather): string {
+  if (!w || 'error' in w) return ''
+  const parts = [w.sun.sunrise && `SUNRISE ${w.sun.sunrise}`, w.sun.sunset && `SUNSET ${w.sun.sunset}`]
+  if (w.airQuality?.europeanAqi != null) parts.push(`AIR ${w.airQuality.rating.toUpperCase()}`)
+  return parts.filter(Boolean).join(' · ')
 }

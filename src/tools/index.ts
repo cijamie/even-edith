@@ -1,9 +1,14 @@
-import type { Agenda } from '../data/agenda'
-import type { Memory } from '../data/memory'
+import { REPEATS, type Agenda, type Repeat } from '../data/agenda'
+import type { Flashcards } from '../data/flashcards'
+import { CATEGORIES, until, type Category, type Memory } from '../data/memory'
 import type { Locator } from '../geo/location'
+import { findPlace, PROFILES, type Profile } from '../geo/route'
+import type { Notice } from '../net/relay'
 import type { Settings } from '../settings'
 import { localIso, spokenDuration } from '../util/time'
+import { calculateTool } from './calc'
 import { currencyDeclaration, convertCurrency } from './currency'
+import { getNews } from './news'
 import { getWeather, weatherAt, weatherDeclaration } from './weather'
 import { webLookup } from './web'
 
@@ -20,13 +25,19 @@ export type Action =
   | { type: 'teleprompter' }
   | { type: 'briefing' }
   | { type: 'protocol'; name: Protocol; minutes?: number }
+  | { type: 'navigate'; query?: string; radar?: number; profile?: Profile }
+  | { type: 'news'; topic: 'world' | 'tech' }
+  | { type: 'flashcards'; deck?: string }
 
 /** What the tools can touch. */
 export type ToolContext = {
   agenda: Agenda
   memory: Memory
+  flashcards: Flashcards
   settings: Settings
   locator: Locator
+  /** Notifications relayed from the phone, newest first. */
+  notices: () => Notice[]
   /** Glasses battery etc., filled in from the SDK. */
   deviceStatus: () => Record<string, unknown>
   actions: Action[]
@@ -37,6 +48,8 @@ type Tool = { declaration: object; run: (args: any, ctx: ToolContext) => Promise
 const obj = (properties: Record<string, object>, required: string[] = []) => ({ type: 'object', properties, required })
 const str = (description: string) => ({ type: 'string', description })
 const TIME = str('Local date-time, ISO 8601 without timezone, e.g. 2026-10-30T15:00:00')
+const LIST = str('List name, e.g. "shopping", "todo", "packing". Default "shopping".')
+const ITEMS = (description: string) => ({ type: 'array', items: { type: 'string' }, description })
 
 /** Parses Gemini's local ISO time; refuses nonsense rather than storing NaN. */
 function parseTime(value: string): number {
@@ -101,12 +114,25 @@ const tools: Record<string, Tool> = {
   remember: {
     declaration: {
       name: 'remember',
-      description: 'Store a long-term fact about the user or something they want remembered (e.g. "parked on level 3", "allergic to peanuts").',
-      parameters: obj({ fact: str('The fact, phrased in third person or as a short statement') }, ['fact']),
+      description:
+        'Store a fact about the user or something they want remembered. Pick a category. For short-lived things ' +
+        '(where they parked, where they left something, today-only plans) set expires, e.g. parking: end of the day. ' +
+        'Lasting facts (allergies, names, preferences) have no expiry.',
+      parameters: obj(
+        {
+          fact: str('The fact, phrased in third person or as a short statement'),
+          category: { type: 'string', enum: [...CATEGORIES] },
+          expires: str('Optional local ISO time when the fact stops being true, e.g. 2026-10-30T23:59:00'),
+        },
+        ['fact', 'category'],
+      ),
     },
-    async run({ fact }, { memory }) {
-      const f = await memory.add(fact)
-      return { remembered: f.text, id: f.id }
+    async run({ fact, category, expires }, { memory }) {
+      const exp = expires ? parseTime(expires) : undefined
+      if (exp != null && exp <= Date.now()) return { error: 'That expiry has already passed.' }
+      const cat: Category = CATEGORIES.includes(category) ? category : 'other'
+      const f = await memory.add(fact, cat, exp)
+      return { remembered: f.text, category: cat, id: f.id, ...(exp && { until: until(exp) }) }
     },
   },
 
@@ -118,6 +144,60 @@ const tools: Record<string, Tool> = {
     },
     async run({ id }, { memory }) {
       return { forgotten: await memory.remove(id) }
+    },
+  },
+
+  calculate: {
+    declaration: {
+      name: 'calculate',
+      description: 'Exact arithmetic. Use for any sum you would otherwise do in your head: + - * / ^, sqrt, %, brackets.',
+      parameters: obj({ expression: str('e.g. "(84*0.15)+12" or "sqrt(2)"') }, ['expression']),
+    },
+    run: (args) => Promise.resolve(calculateTool(args)),
+  },
+
+  get_news: {
+    declaration: {
+      name: 'get_news',
+      description:
+        'Current headlines. topic "world" is Wikipedia\'s In the news (major world events); "tech" is the Hacker News front page. ' +
+        'query searches the past week of Hacker News stories (tech-leaning). Summarise briefly.',
+      parameters: obj({ topic: { type: 'string', enum: ['world', 'tech'] }, query: str('Optional search words') }),
+    },
+    run: (args) => getNews(args),
+  },
+
+  show_news: view(
+    'show_news',
+    'Show a list of headlines on the HUD. Use when the user just says "news" or "headlines" without a specific question.',
+    ({ topic }) => ({ type: 'news', topic: topic === 'tech' ? 'tech' : 'world' }),
+    obj({ topic: { type: 'string', enum: ['world', 'tech'] } }),
+  ),
+
+  navigate: view(
+    'navigate',
+    'Turn-by-turn directions on the HUD map from where the user is now. destination is a place name or address ' +
+      '("British Museum", "nearest Boots", "home"); or radar_number picks a numbered blip from the last radar. ' +
+      'profile: foot (default), bike or car.',
+    ({ destination, radar_number, profile }) => ({
+      type: 'navigate',
+      query: destination,
+      radar: radar_number ? Number(radar_number) : undefined,
+      profile: PROFILES.includes(profile) ? profile : 'foot',
+    }),
+    obj({ destination: str('Place, address or "home"'), radar_number: { type: 'integer' }, profile: { type: 'string', enum: [...PROFILES] } }),
+  ),
+
+  get_notifications: {
+    declaration: {
+      name: 'get_notifications',
+      description: 'Notifications relayed from the phone to EDITH (newest first). Use for "any messages?" or "read my notifications".',
+      parameters: obj({}),
+    },
+    async run(_args, { notices }) {
+      const list = notices()
+      if (!list.length) return { notifications: [], note: 'None received. The relay is set up in the phone app.' }
+      return { notifications: list.slice(0, 10).map((n) => ({ title: n.title, message: n.message, at: localIso(n.at) })) }
     },
   },
 
@@ -210,32 +290,63 @@ const tools: Record<string, Tool> = {
   add_reminder: {
     declaration: {
       name: 'add_reminder',
-      description: 'Remind the user about something at a time. The glasses show it when due.',
-      parameters: obj({ text: str('What to remind about'), time: TIME }, ['text', 'time']),
+      description:
+        'Remind the user about something at a time. The glasses show it when due. For "every day at 8", "weekdays", ' +
+        '"every Monday" etc. set repeat and give the first time it should fire.',
+      parameters: obj({ text: str('What to remind about'), time: TIME, repeat: { type: 'string', enum: [...REPEATS] } }, ['text', 'time']),
     },
-    async run({ text, time }, { agenda }) {
+    async run({ text, time, repeat }, { agenda }) {
       const at = parseTime(time)
-      if (at < Date.now() - 60000) return { error: 'That time has already passed.' }
-      const r = await agenda.addReminder(text, at)
-      return { saved: r.text, at: localIso(r.at) }
+      const r: Repeat = REPEATS.includes(repeat) ? repeat : 'none'
+      if (at < Date.now() - 60000 && r === 'none') return { error: 'That time has already passed.' }
+      const saved = await agenda.addReminder(text, at, r)
+      return { saved: saved.text, at: localIso(saved.at), repeat: r }
+    },
+  },
+
+  add_place_reminder: {
+    declaration: {
+      name: 'add_place_reminder',
+      description:
+        'Remind the user when they are near a kind of place ("next time I pass a pharmacy") or a specific place ' +
+        '("when I get to the office", "at Tesco on High Street"). Fires once, while EDITH is open. ' +
+        `place_type is one of: ${Object.keys(RADAR_CATEGORIES).join(', ')}. Otherwise give place.`,
+      parameters: obj(
+        { text: str('What to remind about'), place_type: { type: 'string', enum: Object.keys(RADAR_CATEGORIES) }, place: str('Named place or address') },
+        ['text'],
+      ),
+    },
+    async run({ text, place_type, place }, { agenda, locator }) {
+      if (place_type && RADAR_CATEGORIES[place_type]) {
+        const r = await agenda.addPlaceReminder({ text, label: `any ${place_type.replace('_', ' ')}`, category: place_type })
+        return { saved: r.text, near: r.label }
+      }
+      if (!place) return { error: 'Need a place_type or a place.' }
+      const found = await findPlace(place, await locator.get(10 * 60_000))
+      if (!found) return { error: `Could not find ${place}.` }
+      const r = await agenda.addPlaceReminder({ text, label: found.name, lat: found.lat, lon: found.lon })
+      return { saved: r.text, near: r.label }
     },
   },
 
   list_reminders: {
-    declaration: { name: 'list_reminders', description: 'List upcoming reminders.', parameters: obj({}) },
+    declaration: { name: 'list_reminders', description: 'List upcoming reminders, repeating ones and place reminders.', parameters: obj({}) },
     async run(_args, { agenda }) {
-      return agenda.reminders.map((r) => ({ id: r.id, text: r.text, at: localIso(r.at) }))
+      return {
+        timed: agenda.reminders.map((r) => ({ id: r.id, text: r.text, at: localIso(r.at), repeat: r.repeat ?? 'none' })),
+        places: agenda.places.map((p) => ({ id: p.id, text: p.text, near: p.label })),
+      }
     },
   },
 
   delete_reminder: {
     declaration: {
       name: 'delete_reminder',
-      description: 'Delete a reminder by id (call list_reminders first to find it).',
+      description: 'Delete a timed or place reminder by id (call list_reminders first to find it). Stops a repeating one for good.',
       parameters: obj({ id: str('Reminder id') }, ['id']),
     },
     async run({ id }, { agenda }) {
-      return { deleted: await agenda.remove('reminders', [id]) }
+      return { deleted: (await agenda.remove('reminders', [id])) + (await agenda.remove('places', [id])) }
     },
   },
 
@@ -280,7 +391,7 @@ const tools: Record<string, Tool> = {
   add_note: {
     declaration: {
       name: 'add_note',
-      description: 'Save a note for the user (shopping items, ideas, things to remember).',
+      description: 'Save a free-form note (ideas, thoughts). Use lists instead for shopping or to-do items.',
       parameters: obj({ text: str('The note') }, ['text']),
     },
     async run({ text }, { agenda }) {
@@ -306,6 +417,109 @@ const tools: Record<string, Tool> = {
       return { deleted: await agenda.remove('notes', [id]) }
     },
   },
+
+  add_to_list: {
+    declaration: {
+      name: 'add_to_list',
+      description: 'Add items to a named list (shopping, todo, packing...). Creates the list if needed.',
+      parameters: obj({ list: LIST, items: ITEMS('One entry per item, e.g. ["milk", "eggs"]') }, ['items']),
+    },
+    run: ({ list, items }, { agenda }) => agenda.addToList(list ?? 'shopping', [].concat(items ?? [])),
+  },
+
+  show_list: {
+    declaration: {
+      name: 'show_list',
+      description: 'Read a list. With no name, gives every list and its open item count.',
+      parameters: obj({ list: LIST }),
+    },
+    async run({ list }, { agenda }) {
+      if (!list) return agenda.lists.map((l) => ({ list: l.name, open: l.items.filter((i) => !i.done).length }))
+      const l = agenda.list(list)
+      if (!l) return { error: `No ${list} list.`, lists: agenda.lists.map((x) => x.name) }
+      return { list: l.name, open: l.items.filter((i) => !i.done).map((i) => i.text), ticked: l.items.filter((i) => i.done).map((i) => i.text) }
+    },
+  },
+
+  tick_items: {
+    declaration: {
+      name: 'tick_items',
+      description: 'Tick off (or untick with done=false) items on a list. Loose matches are fine: "milk" ticks "oat milk".',
+      parameters: obj({ list: LIST, items: ITEMS('Items to tick'), done: { type: 'boolean' } }, ['items']),
+    },
+    async run({ list, items, done }, { agenda }) {
+      const hit = await agenda.markItems(list ?? 'shopping', [].concat(items ?? []), done !== false)
+      return hit.length ? { ticked: hit, done: done !== false } : { error: 'None of those are on the list.' }
+    },
+  },
+
+  remove_from_list: {
+    declaration: {
+      name: 'remove_from_list',
+      description: 'Remove items from a list entirely.',
+      parameters: obj({ list: LIST, items: ITEMS('Items to remove') }, ['items']),
+    },
+    async run({ list, items }, { agenda }) {
+      return { removed: await agenda.removeItems(list ?? 'shopping', [].concat(items ?? [])) }
+    },
+  },
+
+  clear_list: {
+    declaration: {
+      name: 'clear_list',
+      description: 'Clear a list: only_ticked=true removes just the ticked items; delete_list=true removes the list itself.',
+      parameters: obj({ list: LIST, only_ticked: { type: 'boolean' }, delete_list: { type: 'boolean' } }, ['list']),
+    },
+    async run({ list, only_ticked, delete_list }, { agenda }) {
+      return { removed: await agenda.clearList(list, !!only_ticked, !!delete_list) }
+    },
+  },
+
+  add_flashcards: {
+    declaration: {
+      name: 'add_flashcards',
+      description:
+        'Create flashcards in a deck. When the user wants to learn or practise something (a language, capitals, a topic), ' +
+        'write the cards yourself: 10 to 20 short ones unless they say otherwise. Front is the prompt, back the answer. ' +
+        'Keep each side under 80 characters.',
+      parameters: obj(
+        {
+          deck: str('Deck name, e.g. "spanish food"'),
+          cards: {
+            type: 'array',
+            items: { type: 'object', properties: { front: { type: 'string' }, back: { type: 'string' } }, required: ['front', 'back'] },
+          },
+        },
+        ['deck', 'cards'],
+      ),
+    },
+    run: ({ deck, cards }, { flashcards }) => flashcards.add(deck, [].concat(cards ?? [])),
+  },
+
+  list_decks: {
+    declaration: { name: 'list_decks', description: 'Flashcard decks with total and due counts.', parameters: obj({}) },
+    async run(_args, { flashcards }) {
+      return flashcards.decks()
+    },
+  },
+
+  delete_deck: {
+    declaration: {
+      name: 'delete_deck',
+      description: 'Delete a flashcard deck and all its cards.',
+      parameters: obj({ deck: str('Deck name') }, ['deck']),
+    },
+    async run({ deck }, { flashcards }) {
+      return { deleted: await flashcards.removeDeck(deck) }
+    },
+  },
+
+  study_flashcards: view(
+    'study_flashcards',
+    'Start a flashcard session on the HUD (due cards first). Omit deck to study all decks. Use for "quiz me" or "practise my Spanish".',
+    ({ deck }) => ({ type: 'flashcards', deck: deck || undefined }),
+    obj({ deck: str('Deck name') }),
+  ),
 }
 
 export const declarations = Object.values(tools).map((t) => t.declaration)

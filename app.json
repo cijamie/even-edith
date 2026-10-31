@@ -2,13 +2,13 @@
   "package_id": "com.cijamie.evenjarvis",
   "edition": "202601",
   "name": "Even EDITH",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "min_sdk_version": "0.0.16",
   "entrypoint": "index.html",
   "permissions": [
     {
       "name": "network",
-      "desc": "Voice to Groq, questions to Google Gemini, weather from Open-Meteo, rates from open.er-api.com, maps from Esri/OpenStreetMap, places from Photon and Nominatim, facts from Wikipedia and DuckDuckGo.",
+      "desc": "Voice to Groq, questions to Google Gemini, weather and air quality from Open-Meteo, rates from open.er-api.com, maps from Esri/OpenStreetMap, places from Photon and Nominatim, walking routes from OSRM (FOSSGIS), facts from Wikipedia and DuckDuckGo, headlines from Wikipedia and Hacker News, and relayed notifications from ntfy.sh.",
       "whitelist": [
         "https://api.groq.com",
         "https://generativelanguage.googleapis.com",
@@ -19,7 +19,11 @@
         "https://nominatim.openstreetmap.org",
         "https://photon.komoot.io",
         "https://en.wikipedia.org",
-        "https://api.duckduckgo.com"
+        "https://api.duckduckgo.com",
+        "https://air-quality-api.open-meteo.com",
+        "https://routing.openstreetmap.de",
+        "https://hn.algolia.com",
+        "https://ntfy.sh"
       ]
     },
     {
@@ -28,7 +32,7 @@
     },
     {
       "name": "location",
-      "desc": "Shows where you are on the map, finds nearby places for radar, and gives local weather."
+      "desc": "Shows where you are on the map, gives walking directions, finds nearby places for radar and place reminders, and gives local weather."
     }
   ],
   "supported_languages": [
