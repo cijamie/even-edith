@@ -1,7 +1,7 @@
 import type { Agenda } from '../data/agenda'
 import type { Flashcards } from '../data/flashcards'
 import type { Settings } from '../settings'
-import { getNews } from '../tools/news'
+import { worldNews } from '../tools/news'
 import { getWeather } from '../tools/weather'
 import { clock, countdown, dayLabel, isSameDay } from '../util/time'
 
@@ -24,7 +24,7 @@ export class Dashboard {
 
   /** Spoken-style morning briefing from the same data as the dashboard. */
   async briefing(now = Date.now()): Promise<string> {
-    const [, news] = await Promise.all([this.refreshWeather(), getNews({ topic: 'world' }).catch(() => null)])
+    const [, news] = await Promise.all([this.refreshWeather(), worldNews().catch(() => [])])
     const hour = new Date(now).getHours()
     const parts = [hour < 12 ? 'Good morning.' : hour < 18 ? 'Good afternoon.' : 'Good evening.']
     const w = this.weather?.data
@@ -52,8 +52,7 @@ export class Dashboard {
     if (shopping) parts.push(`${shopping} item${shopping > 1 ? 's' : ''} on the shopping list.`)
     const due = this.flashcards.decks().reduce((n, d) => n + d.due, 0)
     if (due) parts.push(`${due} flashcard${due > 1 ? 's' : ''} due.`)
-    const top = news && 'headlines' in news ? news.headlines?.[0] : undefined
-    if (top) parts.push(`In the news: ${top.title}`)
+    if (news[0]) parts.push(`In the news: ${news[0].title}`)
     const s = this.status()
     if (s) parts.push(`Glasses: ${s.replace(/^G2 /, '').toLowerCase()}.`)
     return parts.join(' ')

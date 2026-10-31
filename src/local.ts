@@ -1,6 +1,7 @@
 import type { Agenda } from './data/agenda'
 import type { Memory } from './data/memory'
 import { calculate, convertUnits } from './tools/calc'
+import { searchCurrentEvents } from './tools/news'
 import { clock, countdown, spokenDuration } from './util/time'
 
 /**
@@ -68,6 +69,13 @@ export async function offline(raw: string, agenda: Agenda, memory: Memory): Prom
     if (done.length) return `Ticked off ${done.join(', ')}.`
   }
 
+  // News, from the free Wikipedia feed: "news about Ukraine", "what's happening in Haiti".
+  if ((m = /^(?:(?:what s|what is|any) )?(?:the )?(?:latest )?(?:news (?:about|on|from)|happening (?:in|with)|latest on) (.+)$/.exec(s))) {
+    const found = await searchCurrentEvents(m[1], 3).catch(() => null)
+    if (!found) return "I can't reach the news feeds either."
+    return found.length ? found.map((f) => `${f.date.replace(/^\d{4} /, '')}: ${f.text}`).join('\n') : `Nothing on ${m[1]} in the past week's Wikipedia news.`
+  }
+
   // Notes and memory.
   if ((m = /^(?:take a note|make a note|note|write down|jot down)(?: that)? (.+)$/.exec(s))) {
     await agenda.addNote(m[1])
@@ -86,7 +94,7 @@ export async function offline(raw: string, agenda: Agenda, memory: Memory): Prom
 }
 
 export const OFFLINE_HELP =
-  'Local systems still handle timers, "remind me in", notes, lists, "remember", sums, conversions and the time.'
+  'Local systems still handle timers, "remind me in", notes, lists, "remember", "news about…", sums, conversions and the time.'
 
 /** Lowercase, punctuation to spaces (commas optionally kept), no "EDITH," prefix or "please". */
 const tidy = (raw: string, keepCommas = false) =>

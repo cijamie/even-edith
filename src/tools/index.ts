@@ -8,7 +8,7 @@ import type { Settings } from '../settings'
 import { localIso, spokenDuration } from '../util/time'
 import { calculateTool } from './calc'
 import { currencyDeclaration, convertCurrency } from './currency'
-import { getNews } from './news'
+import { getNews, type WebSearch } from './news'
 import { getWeather, weatherAt, weatherDeclaration } from './weather'
 import { webLookup } from './web'
 
@@ -38,6 +38,8 @@ export type ToolContext = {
   locator: Locator
   /** Notifications relayed from the phone, newest first. */
   notices: () => Notice[]
+  /** Live web search via Gemini grounding (set per question by the Brain). */
+  webSearch?: WebSearch
   /** Glasses battery etc., filled in from the SDK. */
   deviceStatus: () => Record<string, unknown>
   actions: Action[]
@@ -160,11 +162,12 @@ const tools: Record<string, Tool> = {
     declaration: {
       name: 'get_news',
       description:
-        'Current headlines. topic "world" is Wikipedia\'s In the news (major world events); "tech" is the Hacker News front page. ' +
-        'query searches the past week of Hacker News stories (tech-leaning). Summarise briefly.',
-      parameters: obj({ topic: { type: 'string', enum: ['world', 'tech'] }, query: str('Optional search words') }),
+        'Current news. With query: searches the live web (Google), the past week of Wikipedia Current events and Hacker News, ' +
+        'for any topic, person, team, company or place ("World Series result", "Apple", "Ukraine", "UK budget"). ' +
+        'Without query: headlines, topic "world" (default) or "tech". Summarise briefly with dates.',
+      parameters: obj({ query: str('What to search for'), topic: { type: 'string', enum: ['world', 'tech'] } }),
     },
-    run: (args) => getNews(args),
+    run: (args, { webSearch }) => getNews(args, webSearch),
   },
 
   show_news: view(
