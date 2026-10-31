@@ -8,7 +8,7 @@
   "permissions": [
     {
       "name": "network",
-      "desc": "Voice to Groq, questions to Google Gemini, weather and air quality from Open-Meteo, rates from open.er-api.com, maps from Esri/OpenStreetMap, places from Photon and Nominatim, walking routes from OSRM (FOSSGIS), facts from Wikipedia and DuckDuckGo, headlines from Wikipedia and Hacker News, and relayed notifications from ntfy.sh.",
+      "desc": "Voice to Groq, questions to Gemini, weather and air quality from Open-Meteo, exchange rates, maps and places from Esri and OpenStreetMap, walking routes from OSRM, facts and news from Wikipedia, DuckDuckGo and Hacker News, and notifications via ntfy.sh.",
       "whitelist": [
         "https://api.groq.com",
         "https://generativelanguage.googleapis.com",
