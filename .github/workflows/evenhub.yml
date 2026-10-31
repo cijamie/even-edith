@@ -3,10 +3,13 @@ name: Publish to Even Hub
 # Every push to main is packed and uploaded to Even Hub as a new version
 # (major.minor from app.json, patch = this workflow's run number).
 #
-# Setup, once: see "Automatic publishing" in the README. The EVENHUB_CREDENTIALS
-# secret holds the CLI's credentials.yaml. The CLI refreshes its tokens as it goes,
-# so the newest copy is carried between runs in the Actions cache, encrypted with
-# that secret (pull requests from forks can't read secrets, so they can't decrypt it).
+# Setup, once: see "Automatic publishing" in the README. Either:
+# - EVENHUB_EMAIL + EVENHUB_PASSWORD secrets: signs in fresh on every run (easiest,
+#   and can be set up from a phone), or
+# - EVENHUB_CREDENTIALS: the CLI's credentials.yaml from `evenhub login`. The CLI
+#   refreshes its tokens as it goes, so the newest copy is carried between runs in
+#   the Actions cache, encrypted with that secret (fork PRs can't read secrets, so
+#   they can't decrypt it).
 
 on:
   push:
@@ -24,12 +27,14 @@ jobs:
   upload:
     runs-on: ubuntu-latest
     env:
-      HAS_CREDENTIALS: ${{ secrets.EVENHUB_CREDENTIALS != '' }}
+      HAS_CREDENTIALS: ${{ secrets.EVENHUB_CREDENTIALS != '' || (secrets.EVENHUB_EMAIL != '' && secrets.EVENHUB_PASSWORD != '') }}
       CREDENTIALS: ${{ secrets.EVENHUB_CREDENTIALS }}
+      EVENHUB_EMAIL: ${{ secrets.EVENHUB_EMAIL }}
+      EVENHUB_PASSWORD: ${{ secrets.EVENHUB_PASSWORD }}
     steps:
       - name: Check setup
         if: env.HAS_CREDENTIALS != 'true'
-        run: echo "::notice::EVENHUB_CREDENTIALS secret not set; skipping the Even Hub upload. See README > Automatic publishing."
+        run: echo "::notice::No Even Hub login set (EVENHUB_EMAIL + EVENHUB_PASSWORD, or EVENHUB_CREDENTIALS); skipping the upload. See README > Automatic publishing."
 
       - uses: actions/checkout@v4
         if: env.HAS_CREDENTIALS == 'true'
@@ -44,7 +49,7 @@ jobs:
         run: npm ci
 
       - name: Restore refreshed login
-        if: env.HAS_CREDENTIALS == 'true'
+        if: env.CREDENTIALS != ''
         uses: actions/cache/restore@v4
         with:
           path: .evenhub-login
@@ -57,8 +62,21 @@ jobs:
           echo "XDG_CONFIG_HOME=$RUNNER_TEMP/xdg" >> "$GITHUB_ENV"
           dir="$RUNNER_TEMP/xdg/evenhub"
           mkdir -p "$dir"
-          # Prefer the newest refreshed copy; fall back to the secret.
-          if [ -f .evenhub-login/credentials.enc ] && openssl enc -d -aes-256-cbc -pbkdf2 -pass env:CREDENTIALS \
+          if [ -n "$EVENHUB_EMAIL" ] && [ -n "$EVENHUB_PASSWORD" ]; then
+            # The CLI only prompts on a terminal, so give it one with `script`.
+            # Its output echoes the typed password, so keep it out of the log.
+            export XDG_CONFIG_HOME="$RUNNER_TEMP/xdg"
+            set +e
+            printf '%s\n' "$EVENHUB_PASSWORD" | script -qec "npx evenhub login -e \"$EVENHUB_EMAIL\"" /dev/null > "$RUNNER_TEMP/login.log" 2>&1
+            set -e
+            if [ ! -f "$dir/credentials.yaml" ]; then
+              grep -vF "$EVENHUB_PASSWORD" "$RUNNER_TEMP/login.log" | sed 's/\x1b\[[0-9;?]*[A-Za-z]//g' | tail -n 5
+              echo "::error::Even Hub sign-in failed. Check the EVENHUB_EMAIL and EVENHUB_PASSWORD secrets."
+              exit 1
+            fi
+            echo "Signed in with EVENHUB_EMAIL."
+          # Otherwise prefer the newest refreshed copy; fall back to the secret.
+          elif [ -f .evenhub-login/credentials.enc ] && openssl enc -d -aes-256-cbc -pbkdf2 -pass env:CREDENTIALS \
               -in .evenhub-login/credentials.enc -out "$dir/credentials.yaml" 2>/dev/null \
               && grep -q refresh_token "$dir/credentials.yaml"; then
             echo "Using refreshed login from cache."
@@ -98,7 +116,7 @@ jobs:
           set -e
           # 4 = this version already exists (a re-run after a successful upload).
           if [ "$code" = 4 ]; then echo "::notice::$VERSION was already uploaded."; exit 0; fi
-          if [ "$code" = 2 ]; then echo "::error::Even Hub login expired. Log in again and update the EVENHUB_CREDENTIALS secret (README > Automatic publishing)."; fi
+          if [ "$code" = 2 ]; then echo "::error::Even Hub login expired. Update the Even Hub secrets (README > Automatic publishing)."; fi
           exit $code
 
       - name: Send to beta testers
@@ -106,7 +124,7 @@ jobs:
         run: npx evenhub promote "$VERSION" --to beta
 
       - name: Save refreshed login
-        if: always() && env.HAS_CREDENTIALS == 'true'
+        if: always() && env.CREDENTIALS != ''
         run: |
           mkdir -p .evenhub-login
           file="$XDG_CONFIG_HOME/evenhub/credentials.yaml"
