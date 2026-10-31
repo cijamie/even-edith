@@ -10,15 +10,23 @@ import { isNoise, transcribe, type GroqUsage } from './net/groq'
 import { Brain } from './net/gemini'
 import { ApiError } from './net/http'
 import type { Agenda } from './data/agenda'
+import type { Flashcards } from './data/flashcards'
 import type { Memory } from './data/memory'
 import type { Locator } from './geo/location'
+import type { Profile } from './geo/route'
+import { Relay } from './net/relay'
 import type { Settings } from './settings'
 import { RADAR_CATEGORIES, type Action, type Protocol } from './tools'
+import { newsText } from './tools/news'
+import { instant, offline, OFFLINE_HELP } from './local'
+import { Proactive } from './proactive'
 import type { Host, Mode } from './modes/mode'
 import { CaptionsMode } from './modes/captions'
 import { MeetingMode } from './modes/meeting'
 import { TeleprompterMode } from './modes/teleprompter'
 import { MapMode, RadarMode } from './modes/map'
+import { NavigateMode } from './modes/navigate'
+import { FlashcardMode } from './modes/flashcards'
 import { clock, countdown } from './util/time'
 
 type State = 'idle' | 'listening' | 'thinking'
@@ -36,8 +44,25 @@ const FAST: [RegExp, Action | 'close'][] = [
   [/^(?:start |open )?(?:translat(?:e|ion|or))(?: mode)?$/, { type: 'captions', translate: true }],
   [/^(?:open |start )?(?:the )?teleprompter\b/, { type: 'teleprompter' }],
   [/^(?:start |record )(?:a |the )?meeting\b|^meeting mode\b/, { type: 'meeting' }],
+  [/^(?:(?:what s|what is|give me|show me|read me|show|read) )?(?:the )?(?:latest |today s |top )?(?:world )?(?:news|headlines)(?: today)?$/, { type: 'news', topic: 'world' }],
+  [/^(?:(?:what s|what is|give me|show me|read me|show|read) )?(?:the )?(?:latest |today s |top )?tech(?:nology)? (?:news|headlines)(?: today)?$/, { type: 'news', topic: 'tech' }],
+  [/^(?:study|start|open|practi[sc]e|review|quiz me on)(?: my| the)? (?:flash ?cards|cards)$|^(?:flash ?cards|quiz me)$/, { type: 'flashcards' }],
   [/^(?:close|hide|dismiss|exit)\b|^stop$/, 'close'],
 ]
+
+const NUMBERS: Record<string, number> = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9 }
+const PROFILE_WORDS: Record<string, Profile> = { walk: 'foot', cycle: 'bike', bike: 'bike', ride: 'bike', drive: 'car' }
+
+/** "Take me to the British Museum", "navigate to number 2", "cycle to work", "take me home". */
+function navigateAction(command: string): Action | null {
+  const m = /^(?:(?:take me|navigate|directions|get me|guide me|route me|show me the way)(?: to)?|(walk|cycle|bike|ride|drive)(?: me)? to) (.+)$/.exec(command)
+  if (!m) return null
+  const target = m[2].replace(/^(?:the )?(?:way to )?/, '')
+  const profile = m[1] ? PROFILE_WORDS[m[1]] : 'foot'
+  const n = /^(?:number |blip |place |no )?(\d|one|two|three|four|five|six|seven|eight|nine)$/.exec(target)
+  if (n) return { type: 'navigate', radar: NUMBERS[n[1]] ?? Number(n[1]), profile }
+  return { type: 'navigate', query: target, profile }
+}
 
 /**
  * Ring-to-talk loop: hold to record, release to transcribe (Groq Whisper),
@@ -65,30 +90,42 @@ export class Assistant {
   private device: DeviceStatus | null = null
   private briefingCheck = false
   private host: Host
+  private relay: Relay
+  private proactive: Proactive
 
   constructor(
     private bridge: EvenAppBridge,
     private display: Display,
     private settings: Settings,
     private agenda: Agenda,
-    memory: Memory,
+    private memory: Memory,
+    flashcards: Flashcards,
     locator: Locator,
     usage: GroqUsage,
   ) {
     this.recorder = new Recorder(bridge, (level) => void this.display.set(ID.footer, this.waveform.push(level)))
+    // Relayed notifications show as alerts, except during focus (they're still
+    // there for "read my notifications").
+    this.relay = new Relay(settings, (n) => {
+      if (this.protocol !== 'focus') this.alerts.push(truncate(`${n.title ? `${n.title}: ` : ''}${n.message}`, 220))
+    })
+    this.proactive = new Proactive(agenda, settings, locator, (text) => this.alerts.push(text))
     this.brain = new Brain(() => settings.get('gemini'), {
       agenda,
       settings,
       memory,
+      flashcards,
       locator,
+      notices: () => this.relay.recent,
       deviceStatus: () => this.deviceSummary(),
     })
-    this.dashboard = new Dashboard(agenda, settings, () => this.statusLine())
+    this.dashboard = new Dashboard(agenda, flashcards, settings, () => this.statusLine())
     this.host = {
       bridge,
       display,
       settings,
       agenda,
+      flashcards,
       brain: this.brain,
       locator,
       usage,
@@ -182,7 +219,7 @@ export class Assistant {
 
   async run(action: Action) {
     // Views draw over the HUD layout, so leave any full-screen mode first.
-    if (this.mode && ['dashboard', 'briefing', 'protocol'].includes(action.type)) await this.closeMode()
+    if (this.mode && ['dashboard', 'briefing', 'protocol', 'news'].includes(action.type)) await this.closeMode()
     switch (action.type) {
       case 'dashboard':
         return this.openDashboard()
@@ -200,7 +237,22 @@ export class Assistant {
         return this.enterMode(new MeetingMode(this.host))
       case 'teleprompter':
         return this.enterMode(new TeleprompterMode(this.host))
+      case 'navigate':
+        return this.enterMode(new NavigateMode(this.host, { query: action.query, radar: action.radar, profile: action.profile }))
+      case 'flashcards':
+        return this.enterMode(new FlashcardMode(this.host, action.deck))
+      case 'news':
+        return this.showNews(action.topic)
     }
+  }
+
+  private async showNews(topic: 'world' | 'tech') {
+    this.view = 'answer'
+    this.spin('FETCHING')
+    void this.display.set(ID.header, topic === 'tech' ? 'TECH NEWS' : 'WORLD NEWS')
+    const text = await newsText(topic).catch(() => 'The news feeds are not answering.')
+    this.stopSpin()
+    await this.say(text)
   }
 
   private async enterMode(mode: Mode) {
@@ -276,6 +328,9 @@ export class Assistant {
   private async tick() {
     this.mode?.tick?.()
     const now = Date.now()
+    void this.relay.tick()
+    // Proactive nudges wait while you focus.
+    if (this.protocol !== 'focus') void this.proactive.tick(now)
 
     const due = await this.agenda.takeDue()
     for (const t of due.timers) this.alerts.push(`Your ${t.label === 'timer' ? '' : t.label + ' '}timer is done.`)
@@ -414,7 +469,7 @@ export class Assistant {
     if (this.mode) await this.closeMode()
     this.state = 'thinking'
     const command = normalise(question)
-    const fast = FAST.find(([re]) => re.test(command))?.[1]
+    const fast = FAST.find(([re]) => re.test(command))?.[1] ?? navigateAction(command)
     if (fast) {
       this.stopSpin()
       this.state = 'idle'
@@ -422,6 +477,10 @@ export class Assistant {
     }
 
     void this.display.set(ID.header, `» ${truncate(question, 34)}`)
+    // Sums, conversions and the time: exact and instant on the phone.
+    const local = instant(question)
+    if (local) return this.finish(local, true)
+
     this.spin('THINKING')
     try {
       const reply = await this.brain.ask(question)
@@ -434,8 +493,23 @@ export class Assistant {
       return this.finish(reply.text || 'I have nothing useful to add, which is rare.', true)
     } catch (err) {
       console.error(err)
-      return this.finish(explain(err, 'Gemini'))
+      return this.fallback(question, err)
     }
+  }
+
+  /** Gemini is unreachable (or out of quota): handle what we can on the phone. */
+  private async fallback(question: string, err: unknown) {
+    const text = await offline(question, this.agenda, this.memory).catch(() => null)
+    if (text) {
+      this.stopSpin()
+      this.state = 'idle'
+      void this.display.set(ID.header, 'LOCAL SYSTEMS')
+      return this.say(text)
+    }
+    const noKey = err instanceof ApiError && err.message === 'no Gemini key'
+    const why = noKey ? 'I need a Gemini key for that. Add one in the phone app.' : explain(err, 'Gemini')
+    const offlineKinds = ['blocked', 'timeout', 'rate', 'server']
+    return this.finish(err instanceof ApiError && offlineKinds.includes(err.kind) ? `${why} ${OFFLINE_HELP}` : why)
   }
 
   private async finish(text: string, keepQuestion = false) {

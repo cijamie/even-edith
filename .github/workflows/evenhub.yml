@@ -1,0 +1,119 @@
+name: Publish to Even Hub
+
+# Every push to main is packed and uploaded to Even Hub as a new version
+# (major.minor from app.json, patch = this workflow's run number).
+#
+# Setup, once: see "Automatic publishing" in the README. The EVENHUB_CREDENTIALS
+# secret holds the CLI's credentials.yaml. The CLI refreshes its tokens as it goes,
+# so the newest copy is carried between runs in the Actions cache, encrypted with
+# that secret (pull requests from forks can't read secrets, so they can't decrypt it).
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: evenhub
+  cancel-in-progress: false
+
+jobs:
+  upload:
+    runs-on: ubuntu-latest
+    env:
+      HAS_CREDENTIALS: ${{ secrets.EVENHUB_CREDENTIALS != '' }}
+      CREDENTIALS: ${{ secrets.EVENHUB_CREDENTIALS }}
+    steps:
+      - name: Check setup
+        if: env.HAS_CREDENTIALS != 'true'
+        run: echo "::notice::EVENHUB_CREDENTIALS secret not set; skipping the Even Hub upload. See README > Automatic publishing."
+
+      - uses: actions/checkout@v4
+        if: env.HAS_CREDENTIALS == 'true'
+
+      - uses: actions/setup-node@v4
+        if: env.HAS_CREDENTIALS == 'true'
+        with:
+          node-version: 24
+          cache: npm
+
+      - if: env.HAS_CREDENTIALS == 'true'
+        run: npm ci
+
+      - name: Restore refreshed login
+        if: env.HAS_CREDENTIALS == 'true'
+        uses: actions/cache/restore@v4
+        with:
+          path: .evenhub-login
+          key: evenhub-login-${{ github.run_id }}
+          restore-keys: evenhub-login-
+
+      - name: Sign in
+        if: env.HAS_CREDENTIALS == 'true'
+        run: |
+          echo "XDG_CONFIG_HOME=$RUNNER_TEMP/xdg" >> "$GITHUB_ENV"
+          dir="$RUNNER_TEMP/xdg/evenhub"
+          mkdir -p "$dir"
+          # Prefer the newest refreshed copy; fall back to the secret.
+          if [ -f .evenhub-login/credentials.enc ] && openssl enc -d -aes-256-cbc -pbkdf2 -pass env:CREDENTIALS \
+              -in .evenhub-login/credentials.enc -out "$dir/credentials.yaml" 2>/dev/null \
+              && grep -q refresh_token "$dir/credentials.yaml"; then
+            echo "Using refreshed login from cache."
+          else
+            printf '%s\n' "$CREDENTIALS" > "$dir/credentials.yaml"
+            echo "Using login from the EVENHUB_CREDENTIALS secret."
+          fi
+          chmod 600 "$dir/credentials.yaml"
+          npx evenhub self-check
+
+      - name: Set version
+        if: env.HAS_CREDENTIALS == 'true'
+        run: |
+          version=$(node -e '
+            const fs = require("fs")
+            const app = JSON.parse(fs.readFileSync("app.json", "utf8"))
+            const [major, minor] = app.version.split(".")
+            app.version = `${major}.${minor}.${process.env.GITHUB_RUN_NUMBER}`
+            fs.writeFileSync("app.json", JSON.stringify(app, null, 2) + "\n")
+            console.log(app.version)
+          ')
+          echo "VERSION=$version" >> "$GITHUB_ENV"
+          echo "Publishing $version"
+
+      - if: env.HAS_CREDENTIALS == 'true'
+        run: npm run pack
+
+      - name: Upload
+        if: env.HAS_CREDENTIALS == 'true'
+        env:
+          COMMIT_MESSAGE: ${{ github.event.head_commit.message || 'Manual publish' }}
+        run: |
+          changelog=$(printf '%s' "$COMMIT_MESSAGE" | head -n 1 | cut -c1-500)
+          set +e
+          npx evenhub upload even-edith.ehpk -m "$changelog"
+          code=$?
+          set -e
+          # 4 = this version already exists (a re-run after a successful upload).
+          if [ "$code" = 4 ]; then echo "::notice::$VERSION was already uploaded."; exit 0; fi
+          if [ "$code" = 2 ]; then echo "::error::Even Hub login expired. Log in again and update the EVENHUB_CREDENTIALS secret (README > Automatic publishing)."; fi
+          exit $code
+
+      - name: Send to beta testers
+        if: env.HAS_CREDENTIALS == 'true' && vars.EVENHUB_PROMOTE_BETA == 'true'
+        run: npx evenhub promote "$VERSION" --to beta
+
+      - name: Save refreshed login
+        if: always() && env.HAS_CREDENTIALS == 'true'
+        run: |
+          mkdir -p .evenhub-login
+          file="$XDG_CONFIG_HOME/evenhub/credentials.yaml"
+          [ -f "$file" ] && openssl enc -aes-256-cbc -pbkdf2 -salt -pass env:CREDENTIALS -in "$file" -out .evenhub-login/credentials.enc || true
+
+      - if: always() && hashFiles('.evenhub-login/credentials.enc') != ''
+        uses: actions/cache/save@v4
+        with:
+          path: .evenhub-login
+          key: evenhub-login-${{ github.run_id }}

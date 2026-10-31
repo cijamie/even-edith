@@ -5,6 +5,7 @@ import { Store } from './store'
 import { Settings } from './settings'
 import { Agenda } from './data/agenda'
 import { Memory } from './data/memory'
+import { Flashcards } from './data/flashcards'
 import { Locator } from './geo/location'
 import { GroqUsage } from './net/groq'
 import { setLocator } from './net/diagnostics'
@@ -14,6 +15,9 @@ import { mountDiagnostics } from './phone/diagnostics-ui'
 import { mountMirror } from './phone/mirror-ui'
 import { mountTeleprompter } from './phone/teleprompter-ui'
 import { mountMemory } from './phone/memory-ui'
+import { mountLists } from './phone/lists-ui'
+import { mountFlashcards } from './phone/flashcards-ui'
+import { mountRelay } from './phone/relay-ui'
 import { Display } from './hud/display'
 import { ID } from './hud/layout'
 import { boot } from './hud/boot'
@@ -32,8 +36,9 @@ await store.migrate({
 const settings = new Settings(store)
 const agenda = new Agenda(store)
 const memory = new Memory(store)
+const flashcards = new Flashcards(store)
 const usage = new GroqUsage(store)
-await Promise.all([agenda.load(), memory.load(), usage.load()])
+await Promise.all([agenda.load(), memory.load(), flashcards.load(), usage.load()])
 const locator = new Locator(bridge, settings)
 setLocator(() => locator.get(0))
 
@@ -41,7 +46,7 @@ if (new URLSearchParams(location.search).has('probe')) {
   await runProbe(bridge)
 } else {
   const display = new Display(bridge)
-  const assistant = new Assistant(bridge, display, settings, agenda, memory, locator, usage)
+  const assistant = new Assistant(bridge, display, settings, agenda, memory, flashcards, locator, usage)
   // Dev hook: drive the assistant from the console, e.g. edith.handleText('open dashboard').
   if (import.meta.env.DEV) Object.assign(window, { edith: assistant })
 
@@ -81,7 +86,10 @@ if (new URLSearchParams(location.search).has('probe')) {
   await mountKeys(document.getElementById('keys')!, settings, onSettingsChanged)
   await mountPrefs(document.getElementById('prefs')!, settings, () => {})
   await mountTeleprompter(document.getElementById('teleprompter')!, settings, () => ready && void assistant.run({ type: 'teleprompter' }))
+  mountLists(document.getElementById('lists')!, agenda)
+  mountFlashcards(document.getElementById('flashcards')!, flashcards, (deck) => ready && void assistant.run({ type: 'flashcards', deck }))
   mountMemory(document.getElementById('memory')!, memory)
+  await mountRelay(document.getElementById('relay')!, settings)
   mountDiagnostics(document.getElementById('diagnostics')!, settings)
 
   await startBoot()
@@ -95,6 +103,13 @@ if (new URLSearchParams(location.search).has('probe')) {
       await agenda.addReminder('Call mum', now + 2 * 3600_000)
       await agenda.addEvent('Design review', now + 3600_000)
       await agenda.addNote('Buy coffee and oat milk')
+      await agenda.addToList('shopping', ['coffee', 'oat milk', 'eggs'])
+      await agenda.addReminder('Stand-up', now + 20 * 3600_000, 'weekdays')
+      await flashcards.add('spanish', [
+        { front: 'la manzana', back: 'the apple' },
+        { front: 'el pan', back: 'the bread' },
+        { front: 'la leche', back: 'the milk' },
+      ])
       if (!(await settings.homeCity())) await settings.setHomeCity('London')
     }
     const say = params.get('say')

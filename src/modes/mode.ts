@@ -1,5 +1,6 @@
 import type { EvenAppBridge } from '@evenrealities/even_hub_sdk'
 import type { Agenda } from '../data/agenda'
+import type { Flashcards } from '../data/flashcards'
 import type { Locator } from '../geo/location'
 import type { Display } from '../hud/display'
 import type { Brain } from '../net/gemini'
@@ -28,6 +29,7 @@ export type Host = {
   display: Display
   settings: Settings
   agenda: Agenda
+  flashcards: Flashcards
   brain: Brain
   locator: Locator
   usage: GroqUsage

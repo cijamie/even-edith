@@ -81,7 +81,10 @@ export class MapMode implements Mode {
   }
 }
 
-type Place = { name: string; distance: number; bearing: number }
+type Place = { name: string; fullName: string; lat: number; lon: number; distance: number; bearing: number }
+
+/** The last radar's places, so "take me to number 2" can navigate to a blip. */
+export let lastRadar: { name: string; lat: number; lon: number }[] = []
 
 /** "Find cafes nearby": radar of the closest places of a type, via Photon (OpenStreetMap). */
 export class RadarMode implements Mode {
@@ -108,6 +111,7 @@ export class RadarMode implements Mode {
       return this.host.finish('The places search is not answering. Try again shortly.')
     }
     if (!places.length) return this.host.finish(`No ${this.category.replace('_', ' ')} within 2 km.`)
+    lastRadar = places.map((p) => ({ name: p.fullName, lat: p.lat, lon: p.lon }))
 
     const blips: Blip[] = places.map((p, i) => ({ n: i + 1, distance: p.distance, bearing: p.bearing }))
     await draw(this.host, renderRadar(blips, fix.heading))
@@ -145,7 +149,7 @@ export class RadarMode implements Mode {
         const { distance, bearing } = distanceBearing(fix.lat, fix.lon, lat, lon)
         // Short enough that "name · 130m SE" fits one line of the side panel.
         const name = String(f.properties.name ?? q)
-        return { name: name.length > 17 ? name.slice(0, 16).trimEnd() + '.' : name, distance, bearing }
+        return { name: name.length > 17 ? name.slice(0, 16).trimEnd() + '.' : name, fullName: name, lat, lon, distance, bearing }
       })
       .filter((p: Place) => p.distance <= 2000)
       .sort((a: Place, b: Place) => a.distance - b.distance)

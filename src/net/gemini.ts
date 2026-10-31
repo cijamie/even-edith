@@ -21,10 +21,16 @@ function systemPrompt(memory: string) {
     'Keep it to one to three short sentences, under 60 words, unless asked for more detail.',
     'Be accurate first, witty second. Answer the question before any quip.',
     'If something needs live data you have no tool for, say so briefly.',
-    'Use your tools for timers, reminders, calendar events, notes, weather, currency, memory, lookups and the HUD views',
-    '(dashboard, map, radar, captions, translation, meeting recording, teleprompter, briefing, protocols).',
-    'Use web_lookup rather than guessing about facts you are unsure of; say you cannot see live news if asked.',
-    'When the user tells you something worth keeping about themselves or asks you to remember something, call remember.',
+    'Use your tools for timers, reminders (timed, repeating and place-based), calendar events, notes, lists, flashcards,',
+    'weather (with sun, moon, UV and air quality), currency, sums, news, memory, lookups, relayed phone notifications and the HUD views',
+    '(dashboard, map, radar, walking directions, captions, translation, meeting recording, teleprompter, flashcards, briefing, protocols).',
+    'Use calculate for arithmetic rather than doing it in your head.',
+    'Use web_lookup rather than guessing about facts you are unsure of.',
+    'For anything recent (news, results, scores, announcements, prices, anything after your training) call get_news with a query',
+    'before answering, and say when it happened. Never claim you cannot see current news: get_news searches the live web.',
+    'When the user tells you something worth keeping about themselves or asks you to remember something, call remember,',
+    'with an expiry for anything short-lived.',
+    'Shopping and to-do items go on lists, not notes.',
     'Never say you have set, saved, added or deleted something unless you called the tool and it succeeded.',
     'Write times and numbers as digits, e.g. 18:00, 3:30pm, £37.46.',
     'Work out exact local times yourself from relative phrases like "in 20 minutes" or "Tuesday at 3".',
@@ -52,7 +58,7 @@ export class Brain {
     const key = await this.getKey()
     if (!key) throw new ApiError('key', 'no Gemini key')
 
-    const ctx: ToolContext = { ...this.context, actions: [] }
+    const ctx: ToolContext = { ...this.context, actions: [], webSearch: (q) => this.search(q) }
     const turn: Content[] = [{ role: 'user', parts: [{ text: question }] }]
     // Tool calls loop: model asks for a function, we run it and send the result back.
     for (let step = 0; step < 4; step++) {
@@ -85,6 +91,38 @@ export class Brain {
     return clean(content.parts.map((p) => p.text ?? '').join(''))
   }
 
+  /**
+   * Live web search through Gemini's built-in Google Search grounding: same key,
+   * no other service. It can't share a request with our own function tools, so
+   * it runs as a separate call. Returns null if the key's search quota is used up.
+   */
+  async search(query: string): Promise<{ summary: string; sources: string[] } | null> {
+    const key = await this.getKey()
+    if (!key) return null
+    const instructions =
+      `Today is ${new Date().toDateString()}. Search the web for the latest news on the user's topic. ` +
+      'Reply in plain text with up to 5 short factual lines, newest first, each with its date. No markdown.'
+    try {
+      const body = await this.request(key, {
+        systemInstruction: { parts: [{ text: instructions }] },
+        contents: [{ role: 'user', parts: [{ text: query }] }],
+        tools: [{ google_search: {} }],
+        generationConfig: { maxOutputTokens: 1024 },
+      })
+      const candidate = body?.candidates?.[0]
+      const summary = clean((candidate?.content?.parts ?? []).map((p: Part) => p.text ?? '').join(''))
+      if (!summary) return null
+      const sources = (candidate?.groundingMetadata?.groundingChunks ?? [])
+        .map((c: any) => c.web?.title)
+        .filter(Boolean)
+        .slice(0, 5)
+      return { summary, sources }
+    } catch (err) {
+      console.warn('[search]', err)
+      return null
+    }
+  }
+
   private remember(question: string, answer: string) {
     // Text-only history keeps requests small and avoids replaying stale tool data.
     this.history.push({ role: 'user', parts: [{ text: question }] }, { role: 'model', parts: [{ text: answer }] })
@@ -92,6 +130,21 @@ export class Brain {
   }
 
   private async generate(key: string, contents: Content[], system?: string): Promise<Content> {
+    const body = await this.request(
+      key,
+      {
+        systemInstruction: { parts: [{ text: system ?? systemPrompt(this.context.memory.promptBlock()) }] },
+        contents,
+        ...(system ? {} : { tools: [{ functionDeclarations: declarations }] }),
+        generationConfig: { maxOutputTokens: 1024 },
+      },
+      true,
+    )
+    return { role: 'model', parts: body.candidates[0].content.parts }
+  }
+
+  /** POSTs to each model in turn until one answers. */
+  private async request(key: string, payload: object, needParts = false): Promise<any> {
     let lastError: unknown
     for (const model of MODELS) {
       try {
@@ -100,17 +153,11 @@ export class Brain {
           {
             method: 'POST',
             headers: { 'x-goog-api-key': key, 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              systemInstruction: { parts: [{ text: system ?? systemPrompt(this.context.memory.promptBlock()) }] },
-              contents,
-              ...(system ? {} : { tools: [{ functionDeclarations: declarations }] }),
-              generationConfig: { maxOutputTokens: 1024 },
-            }),
+            body: JSON.stringify(payload),
           },
           12000,
         )
-        const content = body?.candidates?.[0]?.content
-        if (content?.parts?.length) return { role: 'model', parts: content.parts }
+        if (!needParts || body?.candidates?.[0]?.content?.parts?.length) return body
         lastError = new ApiError('server', `empty reply (${body?.candidates?.[0]?.finishReason ?? 'no candidate'})`)
       } catch (err) {
         lastError = err

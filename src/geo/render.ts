@@ -65,8 +65,11 @@ function project(lat: number, lon: number, z: number) {
 /** Metres per pixel at a latitude and zoom. */
 export const metresPerPixel = (lat: number, z: number) => (156543.03392 * Math.cos((lat * Math.PI) / 180)) / 2 ** z
 
+/** A route to draw over the map: the path and a flag at the end. */
+export type Overlay = { line: [number, number][]; dest: { lat: number; lon: number } }
+
 /** Renders a north-up map centred on the fix. Returns the canvas (288x288). */
-export async function renderMap(fix: Fix, zoom: number): Promise<HTMLCanvasElement> {
+export async function renderMap(fix: Fix, zoom: number, overlay?: Overlay): Promise<HTMLCanvasElement> {
   const canvas = square()
   const g = canvas.getContext('2d')!
   const c = project(fix.lat, fix.lon, zoom)
@@ -96,6 +99,11 @@ export async function renderMap(fix: Fix, zoom: number): Promise<HTMLCanvasEleme
     px[i] = px[i + 1] = px[i + 2] = v
   }
   g.putImageData(data, 0, 0)
+
+  if (overlay) drawRoute(g, overlay, (lat, lon) => {
+    const p = project(lat, lon, zoom)
+    return [p.x - left, p.y - top]
+  })
 
   // You are here: ring, dot, and a heading wedge when the phone knows it.
   const m = MAP_SIZE / 2
@@ -129,6 +137,32 @@ export async function renderMap(fix: Fix, zoom: number): Promise<HTMLCanvasEleme
   northMarker(g)
   scaleBar(g, metresPerPixel(fix.lat, zoom))
   return canvas
+}
+
+function drawRoute(g: CanvasRenderingContext2D, { line, dest }: Overlay, at: (lat: number, lon: number) => [number, number]) {
+  // A black casing under a white line keeps the route readable over bright roads.
+  for (const [style, width] of [['#000', 11], ['#fff', 6]] as const) {
+    g.strokeStyle = style
+    g.lineWidth = width
+    g.lineJoin = g.lineCap = 'round'
+    g.beginPath()
+    line.forEach(([lat, lon], i) => {
+      const [x, y] = at(lat, lon)
+      if (i) g.lineTo(x, y)
+      else g.moveTo(x, y)
+    })
+    g.stroke()
+  }
+  // Destination: a chequered flag square.
+  const [x, y] = at(dest.lat, dest.lon)
+  g.fillStyle = '#000'
+  g.fillRect(x - 9, y - 9, 18, 18)
+  g.fillStyle = '#fff'
+  g.fillRect(x - 7, y - 7, 7, 7)
+  g.fillRect(x, y, 7, 7)
+  g.strokeStyle = '#fff'
+  g.lineWidth = 1
+  g.strokeRect(x - 7, y - 7, 14, 14)
 }
 
 export type Blip = { n: number; distance: number; bearing: number }

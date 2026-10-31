@@ -40,9 +40,30 @@
         <div id="teleprompter"></div>
       </section>
 
+      <section class="card" aria-labelledby="lists-title">
+        <h2 id="lists-title">Lists</h2>
+        <p class="hint">Say "add eggs to my shopping list" or "what's on my packing list". EDITH mentions the shopping list when you pass a supermarket.</p>
+        <div id="lists"></div>
+      </section>
+
+      <section class="card" aria-labelledby="cards-title">
+        <h2 id="cards-title">Flashcards</h2>
+        <p class="hint">Press to reveal, swipe up if you knew it, down if not. Cards you know come back less often.</p>
+        <div id="flashcards"></div>
+      </section>
+
       <section class="card" aria-labelledby="memory-title">
         <h2 id="memory-title">Memory</h2>
         <div id="memory"></div>
+      </section>
+
+      <section class="card" aria-labelledby="relay-title">
+        <h2 id="relay-title">Alerts and notifications</h2>
+        <p class="hint">
+          The relay uses ntfy.sh, a free hosted service; there is nothing to run yourself. Point a phone automation
+          (iOS Shortcuts, or MacroDroid/Tasker on Android) at the URL to send chosen notifications to EDITH while she's open.
+        </p>
+        <div id="relay"></div>
       </section>
 
       <section class="card" aria-labelledby="diag-title">
@@ -54,7 +75,7 @@
         <div id="diagnostics"></div>
       </section>
 
-      <p class="credit">Map tiles © Esri, HERE, Garmin, © OpenStreetMap contributors. Places by Photon. Weather by Open-Meteo.</p>
+      <p class="credit">Map tiles © Esri, HERE, Garmin, © OpenStreetMap contributors. Places by Photon. Routes by OSRM (FOSSGIS). Weather and air quality by Open-Meteo. News from Wikipedia and Hacker News.</p>
     </main>
     <script type="module" src="./src/main.ts"></script>
   </body>

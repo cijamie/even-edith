@@ -10,7 +10,7 @@ type Pref = {
   set: (v: string) => Promise<void>
 }
 
-/** Home city (weather, map fallback) and the daily briefing time. */
+/** Home city (weather, map fallback), home address (directions) and the daily briefing time. */
 export async function mountPrefs(root: HTMLElement, settings: Settings, onChange: () => void) {
   const prefs: Pref[] = [
     {
@@ -21,6 +21,15 @@ export async function mountPrefs(root: HTMLElement, settings: Settings, onChange
       empty: 'NOT SET',
       get: () => settings.homeCity(),
       set: (v) => settings.setHomeCity(v),
+    },
+    {
+      id: 'home-address',
+      label: 'Home address',
+      type: 'text',
+      placeholder: 'For "take me home"',
+      empty: 'NOT SET',
+      get: () => settings.homeAddress(),
+      set: (v) => settings.setHomeAddress(v),
     },
     {
       id: 'briefing-time',
