@@ -37,21 +37,18 @@ Everything uses free tiers or free public services. Bring your own keys: paste y
 
 Every push to `main` deploys the phone page to GitHub Pages and uploads a new version to Even Hub (`.github/workflows/evenhub.yml`). The version is `major.minor` from `app.json` plus the run number, so you never bump it by hand; change `major.minor` in `app.json` when you want a bigger jump.
 
-One-time setup, all in a browser (no computer of your own needed):
+One-time setup, from your phone's browser:
 
-1. On GitHub, open the repo, then **Code > Codespaces > Create codespace on main**. It's a free cloud terminal.
-2. In its terminal, run these two commands. The first asks for your Even Realities email and password; the second prints the login file.
-   ```bash
-   npx evenhub login
-   ```
-   ```bash
-   cat ~/.config/evenhub/credentials.yaml
-   ```
-3. Copy the whole output. In the repo go to **Settings > Secrets and variables > Actions > New repository secret**, name it `EVENHUB_CREDENTIALS`, and paste it.
-4. Delete the codespace (**Code > Codespaces > … > Delete**) so the login doesn't linger there.
-5. Optional: to send each upload straight to your beta testers, add a repository *variable* (same page, Variables tab) named `EVENHUB_PROMOTE_BETA` with the value `true`. Making it public still happens in the Even Hub portal.
+1. Go to the repo's **Settings > Secrets and variables > Actions > New repository secret** and add two secrets:
+   - `EVENHUB_EMAIL`: your Even Realities email
+   - `EVENHUB_PASSWORD`: your Even Realities password
+2. Go to **Actions > Publish to Even Hub > Run workflow** to publish now, or just push to `main`.
 
-The workflow keeps the login fresh by itself. If it ever fails with "login expired" (after a long gap between pushes), repeat steps 1 to 4.
+GitHub encrypts secrets, never shows them again, and blanks them out of logs; only this repo's workflows can use them, and pull requests from forks can't. If you change your Even password, update the secret.
+
+Optional: to send each upload straight to your beta testers, add a repository *variable* (same page, Variables tab) named `EVENHUB_PROMOTE_BETA` with the value `true`. Making it public still happens in the Even Hub portal.
+
+Prefer not to store your password? Instead run `npx evenhub login` in a Codespace (or any terminal), and save the contents of `~/.config/evenhub/credentials.yaml` as a secret named `EVENHUB_CREDENTIALS`. The workflow keeps that login refreshed by itself; if it ever reports "login expired", repeat this.
 
 ## Notification relay
 
