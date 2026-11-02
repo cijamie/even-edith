@@ -1,6 +1,11 @@
 import type { Agenda } from '../data/agenda'
 import type { Memory } from '../data/memory'
 import type { Lists } from '../data/lists'
+import type { Pins } from '../data/pins'
+import type { Expenses, Period } from '../data/expenses'
+import { periodStart } from '../data/expenses'
+import type { Decks } from '../data/decks'
+import { parseCards } from '../data/decks'
 import type { Transcript } from '../data/transcript'
 import { speakerLabel } from '../data/transcript'
 import type { GoogleCalendar } from '../data/gcal'
@@ -13,6 +18,9 @@ import { webLookup } from './web'
 import { convertUnits, evaluate, fmt, tipSplit } from './calc'
 import { cryptoPrice, departures, LEAGUES, scores } from './live'
 import { PERSONA_IDS, type PersonaId } from '../persona'
+import { issPass, planeOverhead } from './sky'
+import { smartHome } from './home'
+import { findPlace } from '../geo/places'
 
 export const PROTOCOLS = ['standard', 'focus', 'night', 'stealth'] as const
 export type Protocol = (typeof PROTOCOLS)[number]
@@ -24,10 +32,10 @@ export type Action =
   | { type: 'radar'; category: string }
   | { type: 'captions'; translate: boolean }
   | { type: 'meeting' }
-  | { type: 'teleprompter' }
+  | { type: 'teleprompter'; follow?: boolean }
   | { type: 'briefing' }
   | { type: 'protocol'; name: Protocol; minutes?: number }
-  | { type: 'navigate'; query?: string; category?: string }
+  | { type: 'navigate'; query?: string; category?: string; to?: { name: string; lat: number; lon: number } }
   | { type: 'guide'; topic?: string }
   | { type: 'list'; name: string }
   | { type: 'activity'; kind: Activity }
@@ -35,6 +43,10 @@ export type Action =
   | { type: 'handsfree'; on: boolean }
   | { type: 'persona'; id: PersonaId }
   | { type: 'easter'; id: string }
+  | { type: 'emergency' }
+  | { type: 'debrief' }
+  | { type: 'flashcards'; deck?: string }
+  | { type: 'whatsnew' }
 
 export const ACTIVITIES = ['walk', 'run', 'ride'] as const
 export type Activity = (typeof ACTIVITIES)[number]
@@ -48,8 +60,13 @@ export type ToolContext = {
   lists: Lists
   transcript: Transcript
   calendar: GoogleCalendar
+  pins: Pins
+  expenses: Expenses
+  decks: Decks
   /** Google Search grounding through Gemini. */
   search: (query: string) => Promise<{ answer: string; sources: string[] }>
+  /** One-off Gemini text task (no tools), e.g. writing flashcards. */
+  complete: (instructions: string, input: string) => Promise<string>
   /** Glasses battery etc., filled in from the SDK. */
   deviceStatus: () => Record<string, unknown>
   actions: Action[]
@@ -363,9 +380,12 @@ const tools: Record<string, Tool> = {
     'Record a meeting or conversation; when stopped, it is transcribed and summarised into a note with action items.',
     () => ({ type: 'meeting' }),
   ),
-  open_teleprompter: view('open_teleprompter', 'Show the teleprompter script saved in the phone app, paged with swipes.', () => ({
-    type: 'teleprompter',
-  })),
+  open_teleprompter: view(
+    'open_teleprompter',
+    'Show the teleprompter script saved in the phone app. follow=true listens and turns the pages as the user reads aloud; otherwise swipes page it.',
+    ({ follow }) => ({ type: 'teleprompter', follow: !!follow }),
+    obj({ follow: { type: 'boolean' } }),
+  ),
   briefing: view('briefing', 'Give the daily briefing (weather, schedule, reminders).', () => ({ type: 'briefing' })),
   set_protocol: view(
     'set_protocol',
@@ -493,6 +513,208 @@ const tools: Record<string, Tool> = {
       if (String(id).startsWith('g:')) return { error: 'That event is in Google Calendar; delete it there.' }
       return { deleted: await agenda.remove('events', [id]) }
     },
+  },
+
+  plane_overhead: {
+    declaration: {
+      name: 'plane_overhead',
+      description: 'Identify the aircraft flying closest to overhead: flight number, airline, route, aircraft type, altitude and where to look. Use for "what plane is that".',
+      parameters: obj({}),
+    },
+    async run(_args, { locator, calendar }) {
+      const fix = await locator.get(30_000)
+      if (!fix || fix.source === 'home') return { error: 'I need the phone location to see what is overhead.' }
+      let aircraft: any[]
+      try {
+        aircraft = await calendar.planes(fix.lat, fix.lon)
+      } catch (err) {
+        // ADS-B feeds only answer servers, so this goes through the Google Calendar Apps Script.
+        const msg = err instanceof Error ? err.message : ''
+        return {
+          error:
+            msg === 'not linked'
+              ? 'Plane spotting runs through the Google Calendar script. Set it up in the phone app.'
+              : msg === 'old script'
+                ? 'Update the Google Calendar script from the phone app (paste the new one, deploy a new version) to spot planes.'
+                : 'The aircraft feed is not answering. Try again shortly.',
+        }
+      }
+      return planeOverhead(fix, aircraft)
+    },
+  },
+
+  iss_pass: {
+    declaration: {
+      name: 'iss_pass',
+      description: 'Where the International Space Station is and when it next passes over the user (next 4 hours), with direction and whether it will be visible.',
+      parameters: obj({}),
+    },
+    async run(_args, { locator }) {
+      const fix = await locator.get(10 * 60_000)
+      if (!fix) return { error: 'I need a location or home city for ISS passes.' }
+      return issPass(fix)
+    },
+  },
+
+  emergency: view(
+    'emergency',
+    'Emergency protocol: nearest A&E, pharmacy, police and defibrillator, the emergency number, and the user’s location saved for sharing. Use for emergencies, injuries or "I need help".',
+    () => ({ type: 'emergency' }),
+  ),
+
+  debrief: view('debrief', 'End-of-day debrief: meetings, activities, spending, open list items and tomorrow’s first event.', () => ({ type: 'debrief' })),
+
+  whats_new: view('whats_new', 'Show what is new in this version of the app.', () => ({ type: 'whatsnew' })),
+
+  drop_pin: {
+    declaration: {
+      name: 'drop_pin',
+      description: 'Save the user’s current spot under a label, e.g. "car" when they say they parked, "hotel", "tent". Find it later with navigate_to_pin.',
+      parameters: obj({ label: str('Short label, e.g. "car"') }, ['label']),
+    },
+    async run({ label }, { locator, pins }) {
+      const fix = await locator.get(0)
+      if (!fix || fix.source === 'home') return { error: 'I need the phone location to drop a pin.' }
+      const p = await pins.drop(String(label || 'pin'), fix.lat, fix.lon)
+      return { saved: p.label, accuracyMetres: fix.accuracy ? Math.round(fix.accuracy) : undefined }
+    },
+  },
+
+  list_pins: {
+    declaration: { name: 'list_pins', description: 'Saved pins (spots), newest first. Some are dropped automatically at the start of walks and navigation.', parameters: obj({}) },
+    async run(_args, { pins }) {
+      return pins.pins.map((p) => ({ label: p.label, saved: localIso(p.at), automatic: !!p.auto }))
+    },
+  },
+
+  navigate_to_pin: {
+    declaration: {
+      name: 'navigate_to_pin',
+      description: 'Walking directions back to a saved pin: "take me back to the car", "back to where I started". Omit label for the latest pin.',
+      parameters: obj({ label: str('Pin label, e.g. "car", "start of walk", "where I set off"') }),
+    },
+    async run({ label }, { pins, actions }) {
+      const p = pins.find(label)
+      if (!p) return { error: pins.pins.length ? `No pin called ${label}.` : 'No pins saved. Say "I parked here" next time.', pins: pins.pins.map((x) => x.label) }
+      actions.push({ type: 'navigate', to: { name: p.label, lat: p.lat, lon: p.lon } })
+      return { opened: true, to: p.label, note: 'Reply with a very short acknowledgement only.' }
+    },
+  },
+
+  add_location_reminder: {
+    declaration: {
+      name: 'add_location_reminder',
+      description: 'Remind the user when they arrive somewhere: "remind me to buy batteries when I get to Tesco". place "here" means the current spot. Only works while the app is open.',
+      parameters: obj({ text: str('What to remind about'), place: str('Place name or address, or "here"') }, ['text', 'place']),
+    },
+    async run({ text, place }, { locator, pins }) {
+      const fix = await locator.get(30_000)
+      if (!fix || fix.source === 'home') return { error: 'Location reminders need the phone location.' }
+      if (/^(here|this place|this spot)$/i.test(String(place).trim())) {
+        const g = await pins.addGeofence(text, 'this spot', fix.lat, fix.lon)
+        return { saved: g.text, place: g.place }
+      }
+      const found = await findPlace(fix, String(place))
+      if (!found || found.distance > 50_000) return { error: `I couldn't find ${place} nearby.` }
+      const g = await pins.addGeofence(text, found.name, found.lat, found.lon)
+      return { saved: g.text, place: found.name, address: found.address }
+    },
+  },
+
+  list_location_reminders: {
+    declaration: { name: 'list_location_reminders', description: 'Location reminders waiting to fire.', parameters: obj({}) },
+    async run(_args, { pins }) {
+      return pins.geofences.map((g) => ({ id: g.id, text: g.text, place: g.place }))
+    },
+  },
+
+  delete_location_reminder: {
+    declaration: { name: 'delete_location_reminder', description: 'Delete a location reminder by id.', parameters: obj({ id: str('Id') }, ['id']) },
+    async run({ id }, { pins }) {
+      return { deleted: await pins.remove('geofences', id) }
+    },
+  },
+
+  log_expense: {
+    declaration: {
+      name: 'log_expense',
+      description: 'Log money the user spent: "I spent £12 on lunch".',
+      parameters: obj(
+        { amount: { type: 'number' }, what: str('What it was for, e.g. "lunch"'), currency: str('ISO code, e.g. GBP. Omit for the phone’s currency.') },
+        ['amount', 'what'],
+      ),
+    },
+    async run({ amount, what, currency }, { expenses }) {
+      if (!(amount > 0)) return { error: 'The amount must be more than zero.' }
+      const e = await expenses.add(Number(amount), String(what), currency || undefined)
+      return { logged: e.what, amount: e.amount, currency: e.currency, today: expenses.total(expenses.since(periodStart('today'))) }
+    },
+  },
+
+  expense_summary: {
+    declaration: {
+      name: 'expense_summary',
+      description: 'Spending totals and items for today, this week or this month.',
+      parameters: obj({ period: { type: 'string', enum: ['today', 'week', 'month'] } }),
+    },
+    async run({ period }, { expenses }) {
+      const p: Period = ['today', 'week', 'month'].includes(period) ? period : 'week'
+      const items = expenses.since(periodStart(p))
+      return { period: p, total: expenses.total(items), items: items.slice(0, 15).map((e) => ({ id: e.id, what: e.what, amount: e.amount, currency: e.currency, at: localIso(e.at) })) }
+    },
+  },
+
+  delete_expense: {
+    declaration: { name: 'delete_expense', description: 'Delete a logged expense by id (call expense_summary first).', parameters: obj({ id: str('Id') }, ['id']) },
+    async run({ id }, { expenses }) {
+      return { deleted: await expenses.remove(id) }
+    },
+  },
+
+  start_flashcards: view(
+    'start_flashcards',
+    'Practise a flashcard deck on the glasses (spaced repetition). Omit deck for whichever has cards due.',
+    ({ deck }) => ({ type: 'flashcards', deck: deck || undefined }),
+    obj({ deck: str('Deck name') }),
+  ),
+
+  make_flashcards: {
+    declaration: {
+      name: 'make_flashcards',
+      description: 'Write a flashcard deck on a topic and save it, e.g. "make flashcards on French food words". Then offer to start it.',
+      parameters: obj({ topic: str('Topic, with any detail the user gave'), count: { type: 'integer', description: 'Default 15, max 40' }, deck: str('Deck name, default the topic') }, ['topic']),
+    },
+    async run({ topic, count, deck }, { complete, decks }) {
+      const n = Math.max(3, Math.min(40, Number(count) || 15))
+      const text = await complete(
+        `Write ${n} flashcards for studying the topic given. One per line as: question | answer. ` +
+          'Questions under 80 characters, answers under 60. Plain text, no numbering, no markdown, nothing else.',
+        String(topic),
+      )
+      const cards = parseCards(text)
+      if (!cards.length) return { error: 'I could not write cards for that.' }
+      const r = await decks.add(String(deck || topic), cards)
+      return { ...r, firstQuestion: cards[0].q }
+    },
+  },
+
+  list_decks: {
+    declaration: { name: 'list_decks', description: 'Flashcard decks with card counts and how many are due.', parameters: obj({}) },
+    async run(_args, { decks }) {
+      return decks.all.map((d) => ({ deck: d.name, cards: d.cards.length, due: decks.due(d).length }))
+    },
+  },
+
+  smart_home: {
+    declaration: {
+      name: 'smart_home',
+      description: 'Control smart home devices and scenes through the user’s Home Assistant or IFTTT webhooks set up in the phone app.',
+      parameters: obj({ device: str('Device or scene name, e.g. "lights", "heating", "movie scene"'), command: str('What to do in plain words, e.g. "lights off", "heating to 20"') }, [
+        'device',
+        'command',
+      ]),
+    },
+    run: (args, { settings }) => smartHome(args, settings),
   },
 
   add_note: {

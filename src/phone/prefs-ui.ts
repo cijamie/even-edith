@@ -57,6 +57,16 @@ export async function mountPrefs(root: HTMLElement, settings: Settings, onChange
         Each phrase you say is sent to Groq to check for the name (speech the app tags as someone else is skipped),
         which counts against Groq's free daily quota. Works only while the app is open on the glasses.
       </p>
+    </div>
+    <div class="key">
+      <div class="key-head">
+        <label for="proactive">Heads-ups</label>
+        <input id="proactive" type="checkbox" class="toggle" />
+      </div>
+      <p class="hint">
+        EDITH speaks first: rain on the way, when to leave for an event with a location, and who you're meeting.
+        Checks the weather every 10 minutes while the app is open.
+      </p>
     </div>`
   root.append(extra)
   const select = extra.querySelector<HTMLSelectElement>('#persona')!
@@ -71,6 +81,10 @@ export async function mountPrefs(root: HTMLElement, settings: Settings, onChange
     await settings.setHandsFree(toggle.checked)
     onChange()
   })
+
+  const proactive = extra.querySelector<HTMLInputElement>('#proactive')!
+  proactive.checked = await settings.proactive()
+  proactive.addEventListener('change', () => void settings.setProactive(proactive.checked))
 
   for (const p of prefs) {
     const row = document.createElement('div')

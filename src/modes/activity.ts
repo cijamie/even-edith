@@ -40,6 +40,10 @@ export class ActivityMode implements Mode {
     this.started = this.resumedAt = Date.now()
     await this.host.display.set(ID.header, `● ${this.kind.toUpperCase()} · GPS...`)
     this.unwatch = this.host.locator.watch((f) => this.onFix(f))
+    // "Take me back to the start" works afterwards.
+    void this.host.locator.get(60_000).then((f) => {
+      if (f && f.source !== 'home') void this.host.pins.drop(`start of ${this.kind}`, f.lat, f.lon, true)
+    })
     this.render()
   }
 

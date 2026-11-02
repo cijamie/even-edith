@@ -8,6 +8,9 @@ import { Memory } from './data/memory'
 import { Lists } from './data/lists'
 import { Transcript } from './data/transcript'
 import { GoogleCalendar } from './data/gcal'
+import { Pins } from './data/pins'
+import { Expenses } from './data/expenses'
+import { Decks } from './data/decks'
 import { persona } from './persona'
 import { Locator } from './geo/location'
 import { GroqUsage } from './net/groq'
@@ -22,6 +25,12 @@ import { mountGuide } from './phone/guide-ui'
 import { mountLists } from './phone/lists-ui'
 import { mountNotes } from './phone/notes-ui'
 import { mountCalendar } from './phone/calendar-ui'
+import { mountPlaces } from './phone/places-ui'
+import { mountExpenses } from './phone/expenses-ui'
+import { mountFlashcards } from './phone/flashcards-ui'
+import { mountSmartHome } from './phone/smarthome-ui'
+import { mountBackup } from './phone/backup-ui'
+import { mountEmergency } from './phone/emergency-ui'
 import { Display } from './hud/display'
 import { ID } from './hud/layout'
 import { boot } from './hud/boot'
@@ -42,7 +51,10 @@ const agenda = new Agenda(store)
 const memory = new Memory(store)
 const usage = new GroqUsage(store)
 const lists = new Lists(store)
-await Promise.all([agenda.load(), memory.load(), usage.load(), lists.load()])
+const pins = new Pins(store)
+const expenses = new Expenses(store)
+const decks = new Decks(store)
+await Promise.all([agenda.load(), memory.load(), usage.load(), lists.load(), pins.load(), expenses.load(), decks.load()])
 const transcript = new Transcript()
 const calendar = new GoogleCalendar(settings, agenda)
 const locator = new Locator(bridge, settings)
@@ -52,7 +64,7 @@ if (new URLSearchParams(location.search).has('probe')) {
   await runProbe(bridge)
 } else {
   const display = new Display(bridge)
-  const assistant = new Assistant(bridge, display, settings, { agenda, memory, locator, usage, lists, transcript, calendar })
+  const assistant = new Assistant(bridge, display, settings, { agenda, memory, locator, usage, lists, transcript, calendar, pins, expenses, decks })
   // Dev hook: drive the assistant from the console, e.g. edith.handleText('open dashboard').
   if (import.meta.env.DEV) Object.assign(window, { edith: assistant })
 
@@ -93,12 +105,18 @@ if (new URLSearchParams(location.search).has('probe')) {
   const onSettingsChanged = () => ready && void greeting().then((text) => assistant.say(text))
   await mountKeys(document.getElementById('keys')!, settings, onSettingsChanged)
   await mountPrefs(document.getElementById('prefs')!, settings, () => void assistant.loadPrefs())
-  await mountTeleprompter(document.getElementById('teleprompter')!, settings, () => ready && void assistant.run({ type: 'teleprompter' }))
+  await mountTeleprompter(document.getElementById('teleprompter')!, settings, (follow) => ready && void assistant.run({ type: 'teleprompter', follow }))
   await mountGuide(document.getElementById('guide')!, settings, () => ready && void assistant.run({ type: 'guide' }))
   mountLists(document.getElementById('lists')!, lists, (name) => ready && void assistant.run({ type: 'list', name }))
   mountNotes(document.getElementById('notes')!, agenda)
   await mountCalendar(document.getElementById('calendar')!, settings, calendar)
   mountMemory(document.getElementById('memory')!, memory)
+  mountPlaces(document.getElementById('places')!, pins)
+  mountExpenses(document.getElementById('expenses')!, expenses)
+  mountFlashcards(document.getElementById('flashcards')!, decks, (deck) => ready && void assistant.run({ type: 'flashcards', deck }))
+  await mountSmartHome(document.getElementById('smarthome')!, settings)
+  mountEmergency(document.getElementById('emergency')!, locator, () => ready && void assistant.run({ type: 'emergency' }))
+  mountBackup(document.getElementById('backup')!, store)
   mountDiagnostics(document.getElementById('diagnostics')!, settings)
 
   await startBoot()

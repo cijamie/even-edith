@@ -1,12 +1,15 @@
 import type { AudioSpeakerRole, EvenAppBridge } from '@evenrealities/even_hub_sdk'
 import type { Agenda } from '../data/agenda'
 import type { Lists } from '../data/lists'
+import type { Pins } from '../data/pins'
+import type { Decks } from '../data/decks'
 import type { Transcript } from '../data/transcript'
 import type { Locator } from '../geo/location'
 import type { Display } from '../hud/display'
 import type { Brain } from '../net/gemini'
 import type { GroqUsage } from '../net/groq'
 import type { Settings } from '../settings'
+import type { Action } from '../tools'
 
 /**
  * A full-screen activity (captions, map, teleprompter...). The assistant
@@ -35,8 +38,12 @@ export type Host = {
   usage: GroqUsage
   lists: Lists
   transcript: Transcript
+  pins: Pins
+  decks: Decks
   /** Status lines for the diagnostics screen. */
   diagnostics(): Promise<string[]>
   /** Leave the mode and show `text` as EDITH's reply (header defaults to the banner). */
   finish(text: string, header?: string): Promise<void>
+  /** Leave this mode for another view or mode (e.g. emergency → navigation). */
+  run(action: Action): Promise<void>
 }

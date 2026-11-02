@@ -68,6 +68,40 @@
         <div id="memory"></div>
       </section>
 
+      <section class="card" aria-labelledby="places-title">
+        <h2 id="places-title">Places</h2>
+        <p class="hint">Location reminders fire when you arrive, while EDITH is open. Pins are dropped by voice, and automatically at the start of walks and navigation.</p>
+        <div id="places"></div>
+      </section>
+
+      <section class="card" aria-labelledby="expenses-title">
+        <h2 id="expenses-title">Spending</h2>
+        <div id="expenses"></div>
+      </section>
+
+      <section class="card" aria-labelledby="flash-title">
+        <h2 id="flash-title">Flashcards</h2>
+        <p class="hint">Press to flip on the glasses, swipe down for "got it", up for "again". Cards come back on a spaced schedule.</p>
+        <div id="flashcards"></div>
+      </section>
+
+      <section class="card" aria-labelledby="home-title">
+        <h2 id="home-title">Smart home</h2>
+        <p class="hint">"EDITH, lights off." Uses webhooks from Home Assistant Cloud or IFTTT.</p>
+        <div id="smarthome"></div>
+      </section>
+
+      <section class="card" aria-labelledby="sos-title">
+        <h2 id="sos-title">Emergency</h2>
+        <div id="emergency"></div>
+      </section>
+
+      <section class="card" aria-labelledby="backup-title">
+        <h2 id="backup-title">Backup</h2>
+        <p class="hint">Move EDITH to a new phone, or keep a copy before reinstalling.</p>
+        <div id="backup"></div>
+      </section>
+
       <section class="card" aria-labelledby="diag-title">
         <h2 id="diag-title">Connection test</h2>
         <p class="hint">
@@ -80,6 +114,7 @@
       <p class="credit">
         Map tiles © Esri, HERE, Garmin, © OpenStreetMap contributors. Places by Photon. Walking routes by OSRM on
         FOSSGIS servers. Transit by Transitous. Weather by Open-Meteo. Crypto prices by CoinGecko. Scores from ESPN.
+        Aircraft positions from adsb.lol (fetched by your calendar script), routes and types from adsbdb. ISS position from wheretheiss.at. Emergency services from OpenStreetMap via Overpass and Photon.
       </p>
     </main>
     <script type="module" src="./src/main.ts"></script>

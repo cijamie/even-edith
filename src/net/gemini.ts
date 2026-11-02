@@ -33,6 +33,9 @@ function systemPrompt(personaId: string, memory: string) {
     'For stock or crypto prices give the price and day change only; never give investment advice or opinions on buying or selling.',
     'Use calculate for arithmetic, tips and bill splits, and convert_units for conversions, rather than working them out yourself.',
     'If asked what someone just said or to summarise a conversation, call recall_conversation.',
+    'When the user says they parked or wants to mark a spot, call drop_pin; for "take me back to..." call navigate_to_pin.',
+    'When the user mentions money they spent, call log_expense. In an emergency or if they are hurt, call emergency at once.',
+    'Also: plane_overhead, iss_pass, location reminders, flashcards, smart_home and the end-of-day debrief.',
     'When the user tells you something worth keeping about themselves or asks you to remember something, call remember.',
     'Never say you have set, saved, added or deleted something unless you called the tool and it succeeded.',
     'Write times and numbers as digits, e.g. 18:00, 3:30pm, £37.46.',
@@ -52,7 +55,7 @@ export class Brain {
 
   constructor(
     private getKey: () => Promise<string>,
-    private context: Omit<ToolContext, 'actions' | 'search'>,
+    private context: Omit<ToolContext, 'actions' | 'search' | 'complete'>,
   ) {}
 
   reset() {
@@ -61,7 +64,7 @@ export class Brain {
 
   async ask(question: string): Promise<Reply> {
     const key = await this.requireKey()
-    const ctx: ToolContext = { ...this.context, actions: [], search: (q) => this.search(q) }
+    const ctx: ToolContext = { ...this.context, actions: [], search: (q) => this.search(q), complete: (i, t) => this.complete(i, t) }
     const system = systemPrompt(await this.context.settings.persona(), this.context.memory.promptBlock())
     const turn: Content[] = [{ role: 'user', parts: [{ text: question }] }]
     // Tool calls loop: model asks for a function, we run it and send the result back.

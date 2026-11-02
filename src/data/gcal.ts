@@ -12,6 +12,12 @@ const SYNC_MS = 15 * 60_000
 export const APPS_SCRIPT = `// Even EDITH calendar bridge. Deploy > New deployment > Web app,
 // Execute as: Me, Who has access: Anyone. Keep the URL private.
 function doGet(e) {
+  // Aircraft near a point, for "what plane is that?" (ADS-B feeds block browser requests).
+  if (e && e.parameter.planes) {
+    var p = e.parameter.planes.split(',').map(Number)
+    var r = UrlFetchApp.fetch('https://api.adsb.lol/v2/point/' + p[0] + '/' + p[1] + '/15', { muteHttpExceptions: true })
+    return ContentService.createTextOutput(r.getContentText()).setMimeType(ContentService.MimeType.JSON)
+  }
   var days = Number((e && e.parameter.days) || 14)
   var from = new Date(Date.now() - 86400000)
   var to = new Date(Date.now() + days * 86400000)
@@ -21,7 +27,9 @@ function doGet(e) {
       title: ev.getTitle(),
       start: ev.getStartTime().getTime(),
       end: ev.getEndTime().getTime(),
-      allDay: ev.isAllDayEvent()
+      allDay: ev.isAllDayEvent(),
+      location: ev.getLocation(),
+      guests: ev.getGuestList().slice(0, 8).map(function (g) { return g.getName() || g.getEmail() })
     }
   })
   return json({ events: events })
@@ -75,6 +83,8 @@ export class GoogleCalendar {
             start: Number(e.start),
             end: e.end ? Number(e.end) : undefined,
             allDay: !!e.allDay,
+            location: e.location ? String(e.location) : undefined,
+            guests: Array.isArray(e.guests) && e.guests.length ? e.guests.map(String) : undefined,
           }))
         await this.agenda.replaceExternal(events)
         this.lastError = ''
@@ -85,6 +95,18 @@ export class GoogleCalendar {
       }
     })().finally(() => (this.syncing = null))
     return this.syncing
+  }
+
+  /**
+   * Aircraft within ~28 km, fetched by the Apps Script (adsb.lol ADS-B data),
+   * since the public ADS-B feeds don't allow requests from a web page.
+   */
+  async planes(lat: number, lon: number): Promise<any[]> {
+    const url = await this.settings.calendarUrl()
+    if (!url) throw new Error('not linked')
+    const body = await requestJson<{ ac?: any[] }>(`${url}?planes=${lat.toFixed(4)},${lon.toFixed(4)}`, {}, 20000)
+    if (!Array.isArray(body.ac)) throw new Error('old script')
+    return body.ac
   }
 
   /** Creates an event in Google Calendar, then re-syncs. */

@@ -2,7 +2,18 @@ import type { Store } from '../store'
 
 export type Timer = { id: string; label: string; endsAt: number; seconds: number }
 export type Reminder = { id: string; text: string; at: number }
-export type CalEvent = { id: string; title: string; start: number; end?: number; nudged?: boolean; source?: 'google'; allDay?: boolean }
+export type CalEvent = {
+  id: string
+  title: string
+  start: number
+  end?: number
+  nudged?: boolean
+  source?: 'google'
+  allDay?: boolean
+  /** From Google Calendar, with the updated Apps Script. */
+  location?: string
+  guests?: string[]
+}
 export type Note = { id: string; text: string; createdAt: number }
 
 type Data = { timers: Timer[]; reminders: Reminder[]; events: CalEvent[]; notes: Note[] }

@@ -98,6 +98,24 @@ export class Settings {
     return this.store.set('edith.calendarUrl', url)
   }
 
+  /** Rain, leave-now and pre-meeting alerts: on unless turned off ('0'). */
+  async proactive(): Promise<boolean> {
+    return (await this.store.get('edith.proactive')) !== '0'
+  }
+
+  setProactive(on: boolean): Promise<void> {
+    return this.store.set('edith.proactive', on ? '' : '0')
+  }
+
+  /** Smart home webhooks, one "name | url" per line. */
+  smartHome(): Promise<string> {
+    return this.store.get('edith.smartHome')
+  }
+
+  setSmartHome(text: string): Promise<void> {
+    return this.store.set('edith.smartHome', text)
+  }
+
   /** Free-form state the assistant keeps between launches (e.g. last briefing date). */
   getState(key: string): Promise<string> {
     return this.store.get(`edith.state.${key}`)

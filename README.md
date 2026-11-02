@@ -25,6 +25,18 @@ Hold the ring and talk, or turn on hands-free and say "EDITH, …". EDITH answer
 - **Suit diagnostics**: glasses and phone battery, network, GPS, voice quota.
 - **Personalities**: EDITH (dry, tactical), FRIDAY (warm, Irish) or JARVIS (formal, British).
 - **Phone mirror and remote**: a live copy of the HUD on the phone, with controls to drive the glasses while someone else wears them.
+- **"What plane is that?"**: the aircraft closest to overhead, with flight, route, type, altitude and where to look. Runs through the Google Calendar script (ADS-B feeds only answer servers), so link the calendar first. **ISS passes**: when the space station next flies over and whether you'll see it.
+- **Emergency protocol**: "EDITH, emergency." Nearest A&E, pharmacy, police and defibrillator, the local emergency number, and a map link of where you are saved to notes. Press to walk to the A&E. The phone page has a **Share my location** button.
+- **Heads-ups** (EDITH speaks first): **rain** due in the next hour; **leave now** for events with a location, from the walking time; **pre-meeting briefs** with who's coming, where, and anything she remembers about them. Location and guests need the updated calendar script (re-deploy it from the phone page). Turn heads-ups off in Preferences.
+- **Location reminders**: "remind me to buy batteries when I get to Tesco." **Pins**: "I parked here", then "take me back to the car". Pins drop automatically at the start of walks and navigation, so "take me back to where I started" just works.
+- **Spending log**: "I spent £12 on lunch" logs instantly, even offline. Totals and CSV export on the phone.
+- **Debrief**: "EDITH, debrief" sums up the day: events, meetings, activity, spending, open lists, and tomorrow's first event.
+- **Flashcards**: paste cards on the phone, or "make flashcards on French verbs". Press to flip, swipe for got it / again; spaced repetition brings cards back.
+- **Voice-following teleprompter**: "voice teleprompter" turns the pages as you read aloud.
+- **Speaking coach**: meeting summaries end with your pace, filler words and how much of the talking you did.
+- **Smart home**: "EDITH, lights off" through Home Assistant Cloud or IFTTT webhooks you add on the phone.
+- **Backup and restore**: export everything to a file (API keys optional) and restore it on a new phone.
+- **What's new**: shown once on the glasses after an update, or say "what's new".
 
 ### About hands-free
 
@@ -36,7 +48,7 @@ closed or in the background.
 
 Everything uses free tiers or free public services. Bring your own keys: paste your Gemini and Groq API keys into the phone-side settings page. No keys are stored in this repo or the package.
 
-*A fan project, not affiliated with Marvel or Stark Industries.* Map tiles © Esri, HERE, Garmin, © OpenStreetMap contributors. Places by Photon and Nominatim (OpenStreetMap). Walking routes by OSRM on FOSSGIS servers. Transit by Transitous. Weather by Open-Meteo. Crypto prices by CoinGecko. Scores from ESPN.
+*A fan project, not affiliated with Marvel or Stark Industries.* Map tiles © Esri, HERE, Garmin, © OpenStreetMap contributors. Places by Photon and Nominatim (OpenStreetMap). Walking routes by OSRM on FOSSGIS servers. Emergency services from OpenStreetMap via Overpass and Photon. Transit by Transitous. Weather by Open-Meteo. Crypto prices by CoinGecko. Scores from ESPN. Aircraft positions from adsb.lol (fetched by your calendar script), routes and types from adsbdb. ISS position from wheretheiss.at.
 
 ## Develop
 
@@ -44,6 +56,7 @@ Everything uses free tiers or free public services. Bring your own keys: paste y
 npm install
 npm run dev     # Vite dev server on your LAN
 npm run sim     # in a second terminal: open the simulator
+npm test        # unit tests (offline maths, expense parsing, flashcards, teleprompter, coach)
 ```
 
 Opening the dev server in a normal browser also works: the phone page's mirror shows what the glasses would display.

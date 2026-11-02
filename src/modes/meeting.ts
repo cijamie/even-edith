@@ -4,6 +4,7 @@ import { speakerLabel } from '../data/transcript'
 import { isNoise, transcribe } from '../net/groq'
 import { clock, countdown } from '../util/time'
 import { Segmenter, type Segment } from '../voice/segmenter'
+import { coach, type Said } from '../voice/coach'
 import type { Host, Mode } from './mode'
 
 const MAX_MINUTES = 60
@@ -18,6 +19,8 @@ const SUMMARY_PROMPT =
 export class MeetingMode implements Mode {
   readonly name = 'meeting'
   private transcript: string[] = []
+  /** For the speaking coach. */
+  private said: Said[] = []
   private queue: Segment[] = []
   private busy = false
   private started = Date.now()
@@ -71,12 +74,13 @@ export class MeetingMode implements Mode {
 
     const text = this.transcript.join('\n').trim()
     if (!text) return this.host.finish('I heard nothing worth summarising.')
+    const stats = coach(this.said)
     try {
-      const summary = await this.host.brain.complete(SUMMARY_PROMPT, text)
+      const summary = [await this.host.brain.complete(SUMMARY_PROMPT, text), stats].filter(Boolean).join('\n')
       await this.host.agenda.addNote(`Meeting ${clock(this.started)}: ${summary}`)
       await this.host.finish(`${summary}\nSaved to notes.`, 'MEETING SUMMARY')
     } catch {
-      await this.host.agenda.addNote(`Meeting ${clock(this.started)} transcript: ${text.slice(0, 3000)}`)
+      await this.host.agenda.addNote(`Meeting ${clock(this.started)} transcript: ${text.slice(0, 3000)}${stats ? `\n${stats}` : ''}`)
       await this.host.finish("Gemini couldn't summarise it, so I saved the raw transcript to notes.")
     }
   }
@@ -93,6 +97,7 @@ export class MeetingMode implements Mode {
           if (!isNoise(said)) {
             const label = speakerLabel(seg.speaker)
             this.transcript.push(label ? `${label}: ${said}` : said)
+            this.said.push({ text: said, seconds: seg.seconds, speaker: seg.speaker })
             this.host.transcript.add(said, seg.speaker)
             if (!this.stopping) void this.host.display.set(ID.body, `Recording. Press to stop and summarise.\n\n...${said.slice(-120)}`)
           }

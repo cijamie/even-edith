@@ -2,13 +2,13 @@
   "package_id": "com.cijamie.evenjarvis",
   "edition": "202601",
   "name": "Even EDITH",
-  "version": "0.5.2",
+  "version": "0.6.0",
   "min_sdk_version": "0.0.16",
   "entrypoint": "index.html",
   "permissions": [
     {
       "name": "network",
-      "desc": "Voice to Groq; questions and Google Search via Gemini; weather (Open-Meteo); rates (er-api); maps (Esri/OSM); places (Photon, Nominatim); walking routes (OSRM); transit (Transitous); scores (ESPN); crypto (CoinGecko); facts (Wikipedia, DuckDuckGo); your Google Calendar via your own Apps Script.",
+      "desc": "Voice (Groq); answers and search (Gemini); weather (Open-Meteo); rates; maps (Esri/OSM); places and routes (Photon, Nominatim, OSRM, Overpass); transit; scores; crypto; aircraft (adsbdb); ISS; facts (Wikipedia, DuckDuckGo); your Google Apps Script (calendar, planes); your smart home webhooks.",
       "whitelist": [
         "https://api.groq.com",
         "https://generativelanguage.googleapis.com",
@@ -25,16 +25,21 @@
         "https://site.api.espn.com",
         "https://api.coingecko.com",
         "https://script.google.com",
-        "https://script.googleusercontent.com"
+        "https://script.googleusercontent.com",
+        "https://api.adsbdb.com",
+        "https://api.wheretheiss.at",
+        "https://overpass-api.de",
+        "https://hooks.nabu.casa",
+        "https://maker.ifttt.com"
       ]
     },
     {
       "name": "g2-microphone",
-      "desc": "Records from the glasses microphones while you talk to EDITH, for live captions and meeting notes, and, if you turn on hands-free, to listen for \"Hey EDITH\"."
+      "desc": "Records from the glasses microphones while you talk to EDITH, for live captions, meeting notes and the voice-following teleprompter, and, if you turn on hands-free, to listen for \"EDITH\"."
     },
     {
       "name": "location",
-      "desc": "Shows where you are on the map, finds nearby places, gives walking directions, tracks walks and runs, finds nearby transit, and gives local weather."
+      "desc": "Shows where you are on the map, finds nearby places and emergency services, gives walking directions, tracks walks and runs, saves pins and location reminders, warns of rain, finds transit, and identifies planes overhead."
     }
   ],
   "supported_languages": [

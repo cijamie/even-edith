@@ -441,3 +441,51 @@ details summary {
   color: var(--dim);
   text-align: center;
 }
+
+/* Links and file pickers that look like buttons. */
+a.button,
+label.button {
+  display: inline-block;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  color: var(--text);
+  font: 600 14px -apple-system, system-ui, sans-serif;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.facts a.button {
+  padding: 6px 10px;
+  font-size: 13px;
+}
+
+.facts small {
+  color: var(--dim);
+}
+
+.sub {
+  margin: 12px 0 4px;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--dim);
+}
+
+.totals {
+  margin: 0 0 8px;
+  font-size: 15px;
+}
+
+.totals b {
+  color: var(--accent);
+}
+
+.deck-list {
+  margin-bottom: 8px;
+}
+
+.actions {
+  flex-wrap: wrap;
+}

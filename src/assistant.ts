@@ -15,6 +15,12 @@ import type { Memory } from './data/memory'
 import type { Lists } from './data/lists'
 import type { Transcript } from './data/transcript'
 import type { GoogleCalendar } from './data/gcal'
+import type { Pins } from './data/pins'
+import type { Decks } from './data/decks'
+import { money, parseExpense, periodStart, type Expenses } from './data/expenses'
+import { Proactive } from './proactive'
+import { debrief } from './debrief'
+import { VERSION, whatsNew } from './version'
 import type { Locator } from './geo/location'
 import type { Settings } from './settings'
 import { persona, type PersonaId } from './persona'
@@ -24,7 +30,9 @@ import { offlineAnswer } from './offline'
 import type { Host, Mode } from './modes/mode'
 import { CaptionsMode } from './modes/captions'
 import { MeetingMode } from './modes/meeting'
-import { TeleprompterMode } from './modes/teleprompter'
+import { FollowTeleprompterMode, TeleprompterMode } from './modes/teleprompter'
+import { EmergencyMode } from './modes/emergency'
+import { FlashcardMode } from './modes/flashcards'
 import { MapMode, RadarMode } from './modes/map'
 import { NavMode } from './modes/nav'
 import { GuideMode } from './modes/guide'
@@ -32,7 +40,7 @@ import { ListMode } from './modes/list'
 import { ActivityMode } from './modes/activity'
 import { bar, SuitMode } from './modes/suit'
 import { IronManMode } from './modes/ironman'
-import { clock, countdown } from './util/time'
+import { countdown } from './util/time'
 
 type State = 'idle' | 'listening' | 'thinking'
 type View = 'answer' | 'dashboard'
@@ -50,7 +58,12 @@ const FAST: [RegExp, Action | 'close'][] = [
   [/^(?:(?:please|can you|could you)\s+)?(?:open|show)(?: me)?(?: the| a| my)? map\b|^where am i\b/, { type: 'map' }],
   [/^(?:start |open |turn on )?(?:live )?(?:captions|subtitles)\b/, { type: 'captions', translate: false }],
   [/^(?:start |open )?(?:translat(?:e|ion|or))(?: mode)?$/, { type: 'captions', translate: true }],
+  [/^(?:open |start )?(?:the )?(?:voice |follow(?:ing)? )teleprompter\b|^teleprompter follow/, { type: 'teleprompter', follow: true }],
   [/^(?:open |start )?(?:the )?teleprompter\b/, { type: 'teleprompter' }],
+  [/^(?:emergency|emergency protocol|i need help|call for help)$/, { type: 'emergency' }],
+  [/^(?:give me |run )?(?:the |a |my )?(?:daily |end of day )?debrief$/, { type: 'debrief' }],
+  [/^(?:what s new|whats new|what is new|changelog)\b/, { type: 'whatsnew' }],
+  [/^(?:start |open |practi[sc]e )?(?:my )?flash ?cards$/, { type: 'flashcards' }],
   [/^(?:start |record )(?:a |the )?meeting\b|^meeting mode\b/, { type: 'meeting' }],
   [/^(?:run |open |show )?(?:suit |system )?diagnostics\b|^status report\b/, { type: 'diagnostics' }],
   [/^(?:start|turn on|enable) hands ?free\b/, { type: 'handsfree', on: true }],
@@ -71,6 +84,9 @@ export type Deps = {
   lists: Lists
   transcript: Transcript
   calendar: GoogleCalendar
+  pins: Pins
+  expenses: Expenses
+  decks: Decks
 }
 
 /**
@@ -111,6 +127,8 @@ export class Assistant {
   private usage: GroqUsage
   private calendar: GoogleCalendar
   private locator: Locator
+  private expenses: Expenses
+  private proactive: Proactive
 
   constructor(
     private bridge: EvenAppBridge,
@@ -118,7 +136,8 @@ export class Assistant {
     private settings: Settings,
     deps: Deps,
   ) {
-    ;({ agenda: this.agenda, lists: this.lists, usage: this.usage, calendar: this.calendar, locator: this.locator } = deps)
+    ;({ agenda: this.agenda, lists: this.lists, usage: this.usage, calendar: this.calendar, locator: this.locator, expenses: this.expenses } = deps)
+    this.proactive = new Proactive({ settings, agenda: deps.agenda, locator: deps.locator, memory: deps.memory, pins: deps.pins })
     this.recorder = new Recorder(bridge, (level) => void this.display.set(ID.footer, this.waveform.push(level)))
     this.wake = new WakeListener(bridge, (u) => void this.onUtterance(u))
     this.brain = new Brain(() => settings.get('gemini'), {
@@ -129,6 +148,9 @@ export class Assistant {
       lists: deps.lists,
       transcript: deps.transcript,
       calendar: deps.calendar,
+      pins: deps.pins,
+      expenses: deps.expenses,
+      decks: deps.decks,
       deviceStatus: () => this.deviceSummary(),
     })
     this.dashboard = new Dashboard(deps.agenda, settings, () => this.statusLine())
@@ -142,8 +164,11 @@ export class Assistant {
       usage: deps.usage,
       lists: deps.lists,
       transcript: deps.transcript,
+      pins: deps.pins,
+      decks: deps.decks,
       diagnostics: () => this.diagnostics(),
       finish: (text, header) => this.closeMode(text, header),
+      run: (action) => this.run(action),
     }
     void bridge
       .getDeviceInfo()
@@ -159,6 +184,22 @@ export class Assistant {
     this.live = true
     this.syncWake()
     void this.calendar.sync().catch(() => {})
+    void this.maybeWhatsNew()
+  }
+
+  /** Once per version, a few seconds after boot so the greeting is seen first. */
+  private async maybeWhatsNew() {
+    if ((await this.settings.getState('seenVersion')) === VERSION || !whatsNew()) return
+    await this.settings.setState('seenVersion', VERSION)
+    setTimeout(() => {
+      if (!this.mode && this.state === 'idle' && !this.typing && this.view === 'answer') void this.showWhatsNew()
+    }, 5000)
+  }
+
+  private async showWhatsNew() {
+    this.view = 'answer'
+    void this.display.set(ID.header, `WHAT'S NEW · V${VERSION}`)
+    await this.say(whatsNew() || 'Nothing new to report.')
   }
 
   /** Re-reads personality and hands-free after the phone settings change. */
@@ -265,7 +306,7 @@ export class Assistant {
 
   async run(action: Action) {
     // Views draw over the HUD layout, so leave any full-screen mode first.
-    if (this.mode && ['dashboard', 'briefing', 'protocol', 'handsfree', 'persona', 'easter'].includes(action.type)) await this.closeMode()
+    if (this.mode && ['dashboard', 'briefing', 'debrief', 'whatsnew', 'protocol', 'handsfree', 'persona', 'easter'].includes(action.type)) await this.closeMode()
     switch (action.type) {
       case 'dashboard':
         return this.openDashboard()
@@ -282,10 +323,20 @@ export class Assistant {
       case 'meeting':
         return this.enterMode(new MeetingMode(this.host))
       case 'teleprompter':
-        return this.enterMode(new TeleprompterMode(this.host))
+        return this.enterMode(action.follow ? new FollowTeleprompterMode(this.host) : new TeleprompterMode(this.host))
+      case 'emergency':
+        return this.enterMode(new EmergencyMode(this.host))
+      case 'flashcards':
+        return this.enterMode(new FlashcardMode(this.host, action.deck))
+      case 'debrief':
+        this.view = 'answer'
+        void this.display.set(ID.header, 'DEBRIEF')
+        return this.say(debrief({ agenda: this.agenda, lists: this.lists, expenses: this.expenses }))
+      case 'whatsnew':
+        return this.showWhatsNew()
       case 'navigate': {
         const cat = action.category && RADAR_CATEGORIES[action.category]
-        return this.enterMode(new NavMode(this.host, action.query, cat ? { label: action.category!.replace('_', ' '), osmTag: cat } : undefined))
+        return this.enterMode(new NavMode(this.host, action.query, cat ? { label: action.category!.replace('_', ' '), osmTag: cat } : undefined, action.to))
       }
       case 'guide':
         return this.enterMode(new GuideMode(this.host, action.topic))
@@ -464,11 +515,11 @@ export class Assistant {
       }
     } else {
       // Heads-up before events, held back during focus.
-      for (const e of await this.agenda.takeUpcoming(NUDGE_LEAD_MS, now)) {
-        this.alerts.push(`${e.title} at ${clock(e.start)}, in ${Math.max(1, Math.round((e.start - now) / 60_000))} minutes.`)
-      }
+      for (const e of await this.agenda.takeUpcoming(NUDGE_LEAD_MS, now)) this.alerts.push(this.proactive.brief(e, now))
       void this.maybeBriefing(now)
     }
+    // Rain, leave-now and location reminders (each check paces itself).
+    if (this.live) void this.proactive.check(now).then((a) => this.alerts.push(...a))
 
     const idle = !this.mode && this.state === 'idle' && !this.typing && !this.alerting
     if (this.alerts.length && idle) {
@@ -670,6 +721,12 @@ export class Assistant {
     }
 
     void this.display.set(ID.header, `» ${truncate(question, 34)}`)
+    // "I spent £12 on lunch" logs locally: instant, and works with no signal.
+    const spent = parseExpense(question)
+    if (spent) {
+      const e = await this.expenses.add(spent.amount, spent.what, spent.currency)
+      return this.finish(`Logged ${money(e.amount, e.currency)} for ${e.what}. Today: ${this.expenses.total(this.expenses.since(periodStart('today')))}.`, true)
+    }
     // Simple maths answers locally: instant, exact, and works with no signal.
     const quick = quickAnswer(question)
     if (quick) return this.finish(quick, true)

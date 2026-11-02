@@ -1,5 +1,5 @@
 import { ID } from '../hud/layout'
-import { metres, type Fix } from '../geo/location'
+import { distanceBearing, metres, type Fix } from '../geo/location'
 import { findPlace, nearby, type Place } from '../geo/places'
 import { RouteFollower, walkingRoute } from '../geo/route'
 import { renderMap } from '../geo/render'
@@ -27,6 +27,8 @@ export class NavMode implements Mode {
     private host: Host,
     private query?: string,
     private category?: { label: string; osmTag: string },
+    /** A known point (a saved pin, the nearest A&E) instead of a search. */
+    private to?: { name: string; lat: number; lon: number },
   ) {}
 
   async enter() {
@@ -38,11 +40,13 @@ export class NavMode implements Mode {
 
     void display.set(ID.body, 'Finding the place...')
     try {
-      this.dest = this.category
-        ? ((await nearby(fix, this.category.osmTag, this.category.label, 3))[0] ?? null)
-        : this.query
-          ? await findPlace(fix, this.query)
-          : null
+      this.dest = this.to
+        ? { ...this.to, ...distanceBearing(fix.lat, fix.lon, this.to.lat, this.to.lon) }
+        : this.category
+          ? ((await nearby(fix, this.category.osmTag, this.category.label, 3))[0] ?? null)
+          : this.query
+            ? await findPlace(fix, this.query)
+            : null
     } catch {
       return this.host.finish('The places search is not answering. Try again shortly.')
     }
@@ -51,6 +55,8 @@ export class NavMode implements Mode {
 
     void display.set(ID.body, 'Plotting route...')
     if (!(await this.plan(fix))) return this.host.finish("I couldn't plot a walking route there.")
+    // So "take me back" works afterwards without having dropped a pin first.
+    if (!this.to) void this.host.pins.drop('where I set off', fix.lat, fix.lon, true)
     // The side panel's header fits ~18 characters.
     const name = this.dest.name.toUpperCase()
     void display.set(ID.header, `TO ${name.length > 14 ? name.slice(0, 13).trimEnd() + '.' : name}`)

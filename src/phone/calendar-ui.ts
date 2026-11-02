@@ -13,6 +13,7 @@ export async function mountCalendar(root: HTMLElement, settings: Settings, calen
         <li>Copy the web app URL (ends in <code>/exec</code>) and paste it here.</li>
       </ol>
       <p class="hint">Anyone with that URL can read your calendar and add events, so keep it private.</p>
+      <p class="hint">Linked before version 0.6? Paste the new script and choose Deploy → Manage deployments → Edit → New version, so EDITH gets event locations and guests for leave-now alerts and meeting briefs.</p>
       <textarea class="code" rows="8" readonly aria-label="Apps Script code">${APPS_SCRIPT.replace(/</g, '&lt;')}</textarea>
       <div class="actions"><button type="button" class="copy">Copy script</button></div>
     </details>
