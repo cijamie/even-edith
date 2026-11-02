@@ -129,6 +129,8 @@ export class Assistant {
   private locator: Locator
   private expenses: Expenses
   private proactive: Proactive
+  /** Anything asked or run since launch (keeps the what's-new note from covering it). */
+  private asked = false
 
   constructor(
     private bridge: EvenAppBridge,
@@ -190,9 +192,11 @@ export class Assistant {
   /** Once per version, a few seconds after boot so the greeting is seen first. */
   private async maybeWhatsNew() {
     if ((await this.settings.getState('seenVersion')) === VERSION || !whatsNew()) return
-    await this.settings.setState('seenVersion', VERSION)
     setTimeout(() => {
-      if (!this.mode && this.state === 'idle' && !this.typing && this.view === 'answer') void this.showWhatsNew()
+      // Never over something the user asked for; it waits for the next launch instead.
+      if (this.asked || this.mode || this.state !== 'idle' || this.typing || this.view !== 'answer') return
+      void this.settings.setState('seenVersion', VERSION)
+      void this.showWhatsNew()
     }, 5000)
   }
 
@@ -305,6 +309,7 @@ export class Assistant {
   // ── Views and modes ──────────────────────────────────────────────
 
   async run(action: Action) {
+    this.asked = true
     // Views draw over the HUD layout, so leave any full-screen mode first.
     if (this.mode && ['dashboard', 'briefing', 'debrief', 'whatsnew', 'protocol', 'handsfree', 'persona', 'easter'].includes(action.type)) await this.closeMode()
     switch (action.type) {
@@ -710,6 +715,7 @@ export class Assistant {
 
   /** Runs a transcribed or typed request (the phone remote calls this too). */
   async handleText(question: string) {
+    this.asked = true
     if (this.mode) await this.closeMode()
     this.state = 'thinking'
     const command = normalise(question)

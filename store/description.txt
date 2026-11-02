@@ -1,0 +1,24 @@
+EDITH is a voice assistant for your G2 that lives on the display. Hold the ring and ask, or turn on hands-free and just say "EDITH, ...". Answers type out on the HUD in a dry, to-the-point voice, with Google Search for anything current.
+
+ASK ANYTHING
+News, prices, scores, flight status, quick facts. Maths, tips, bill splits and unit conversions answer instantly, even offline.
+
+GET AROUND
+Walking directions with a turn arrow and street names. Nearby cafes, pharmacies and transit departures. "Remind me to buy batteries when I get to the shop." "I parked here", then later "take me back to the car". Ask "what plane is that?" when one flies over.
+
+STAY ON TOP OF THE DAY
+A dashboard with time, weather, timers, reminders and your Google Calendar. Heads-ups when rain is coming, when to leave for an event, and who you're about to meet. Lists you tick off with the ring. A daily briefing in the morning and a debrief at night.
+
+CONVERSATIONS
+Live captions and translation, with rewind. Meeting mode records, transcribes and saves a summary with action items, plus a speaking coach: your pace, filler words and how much of the talking you did.
+
+ON STAGE AND IN THE KITCHEN
+A teleprompter that follows your voice and turns the page as you read. Recipes and how-tos one step per screen, with a timer for each step. Flashcards with spaced repetition.
+
+AND MORE
+Spending log ("I spent 12 pounds on lunch"), smart home control through Home Assistant or IFTTT, an emergency screen with the nearest hospital, police and pharmacy, a walk and run tracker, three personalities, and a phone remote that mirrors the display.
+
+BRING YOUR OWN KEYS
+EDITH uses free tiers: paste your own Gemini and Groq API keys into the phone app. Keys and data stay on your phone.
+
+A fan project, not affiliated with Marvel or Disney.

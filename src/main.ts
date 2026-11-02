@@ -132,13 +132,28 @@ if (new URLSearchParams(location.search).has('probe')) {
   // Dev-only test hooks for the simulator: ?seed adds sample items, ?say=... runs a phrase as if spoken.
   if (import.meta.env.DEV) {
     const params = new URLSearchParams(location.search)
-    if (params.has('seed')) {
+    // Once per device, so relaunching with ?seed (e.g. for screenshots) doesn't pile up duplicates.
+    if (params.has('seed') && !(await settings.getState('seeded'))) {
+      await settings.setState('seeded', '1')
       const now = Date.now()
       await agenda.addTimer(250, 'pasta')
       await agenda.addReminder('Call mum', now + 2 * 3600_000)
       await agenda.addEvent('Design review', now + 3600_000)
       await agenda.addNote('Buy coffee and oat milk')
       if (!(await settings.homeCity())) await settings.setHomeCity('London')
+      await lists.add('shopping', ['Oat milk', 'Coffee beans', 'Batteries', 'Basil'])
+      await expenses.add(4.5, 'coffee', 'GBP')
+      await expenses.add(12, 'lunch', 'GBP')
+      await decks.add('Capitals', [
+        { q: 'Capital of Australia?', a: 'Canberra' },
+        { q: 'Capital of Canada?', a: 'Ottawa' },
+        { q: 'Capital of Japan?', a: 'Tokyo' },
+      ])
+      if (!(await settings.teleprompter())) {
+        await settings.setTeleprompter(
+          'Good evening, everyone. Thank you for coming. A year ago this was an idea on a napkin. Tonight it ships to ten thousand people, and every one of you helped make that happen.',
+        )
+      }
     }
     const say = params.get('say')
     if (say) await assistant.handleText(say)
