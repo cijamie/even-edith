@@ -36,6 +36,18 @@ body {
   gap: 12px;
 }
 
+.masthead .logo {
+  flex: none;
+  width: 48px;
+  height: 48px;
+  border-radius: 11px;
+}
+
+.masthead .brand {
+  flex: 1;
+  min-width: 0;
+}
+
 .sos {
   flex: none;
   padding: 8px 14px;

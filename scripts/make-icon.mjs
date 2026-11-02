@@ -1,15 +1,31 @@
-// Generates public/icon.png: a 24x24 greyscale ring (the "arc reactor").
+// Generates public/icon.png: the 24x24 greyscale Even Hub icon. Even Hub reads it
+// in 2x2 blocks, so it's drawn on a 12x12 grid: the logo's glasses, with the arc
+// reactor core in the left lens and HUD lines in the right (see assets/logo-mark.svg).
 import { deflateSync } from 'node:zlib'
 import { mkdirSync, writeFileSync } from 'node:fs'
+
+// # frame, @ reactor core, + reactor glow, - HUD line, . empty
+const GRID = [
+  '............',
+  '............',
+  '#..........#',
+  '.####..####.',
+  '#.++.##....#',
+  '#+@@+##.--.#',
+  '#+@@+##....#',
+  '#.++.##.-..#',
+  '.####..####.',
+  '............',
+  '............',
+  '............',
+]
+const SHADE = { '#': 255, '@': 255, '+': 110, '-': 170, '.': 0 }
 
 const size = 24
 const rows = []
 for (let y = 0; y < size; y++) {
   const row = [0] // PNG filter byte: none
-  for (let x = 0; x < size; x++) {
-    const d = Math.hypot(x - 11.5, y - 11.5)
-    row.push(d > 7.5 && d < 10.5 ? 255 : d < 3.5 ? 200 : 0)
-  }
+  for (let x = 0; x < size; x++) row.push(SHADE[GRID[y >> 1][x >> 1]])
   rows.push(Buffer.from(row))
 }
 

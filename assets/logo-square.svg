@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <title>Even EDITH</title>
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="38%" r="75%">
+      <stop offset="0" stop-color="#0d1a11" />
+      <stop offset="1" stop-color="#030504" />
+    </radialGradient>
+    <radialGradient id="core" cx="50%" cy="50%" r="50%">
+      <stop offset="0" stop-color="#eaffef" />
+      <stop offset="0.45" stop-color="#7dffa0" />
+      <stop offset="1" stop-color="#39ff6a" stop-opacity="0" />
+    </radialGradient>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="7" result="blur" />
+      <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
+    </filter>
+    <filter id="soft" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="3" result="blur" />
+      <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
+    </filter>
+  </defs>
+
+  <!-- Full-bleed square: stores and launchers round the corners themselves. -->
+  <rect width="1024" height="1024" fill="url(#bg)" />
+
+  <!-- The mark from logo-mark.svg, scaled 1.6x and centred in the top half. -->
+  <g transform="translate(102.4 -36) scale(1.6)" fill="none" stroke="#39ff6a" stroke-linecap="round" stroke-linejoin="round">
+    <g stroke-width="14" filter="url(#soft)">
+      <circle cx="160" cy="268" r="96" />
+      <circle cx="352" cy="268" r="96" />
+      <path d="M232 205 Q256 186 280 205" />
+      <path d="M64 252 L44 214" />
+      <path d="M448 252 L468 214" />
+    </g>
+    <g filter="url(#glow)">
+      <circle cx="160" cy="268" r="62" stroke-width="15" stroke-dasharray="22 16.96" transform="rotate(-90 160 268)" />
+      <circle cx="160" cy="268" r="38" stroke-width="3" opacity="0.6" />
+    </g>
+    <circle cx="160" cy="268" r="34" fill="url(#core)" stroke="none" />
+    <g stroke-width="7" opacity="0.95">
+      <path d="M302 222 v-14 h18 M402 222 v-14 h-18 M302 314 v14 h18 M402 314 v14 h-18" />
+    </g>
+    <g stroke-width="9" filter="url(#soft)">
+      <path d="M318 242 h56" />
+      <path d="M318 268 h68" />
+      <path d="M318 294 h40" />
+    </g>
+  </g>
+
+  <!-- Wordmark. Letter-spacing adds space after the last letter too, so x is nudged by half of it. -->
+  <g font-family="'JetBrains Mono', Consolas, 'SF Mono', Menlo, monospace" text-anchor="middle">
+    <text x="527" y="690" font-size="58" letter-spacing="30" fill="#7fa58a">EVEN</text>
+    <text x="524" y="842" font-size="172" font-weight="700" letter-spacing="24" fill="#39ff6a" filter="url(#soft)">EDITH</text>
+    <line x1="292" y1="896" x2="732" y2="896" stroke="#1d3324" stroke-width="4" />
+  </g>
+</svg>

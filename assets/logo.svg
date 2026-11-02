@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 360" width="1200" height="360">
+  <title>Even EDITH</title>
+  <defs>
+    <radialGradient id="core" cx="50%" cy="50%" r="50%">
+      <stop offset="0" stop-color="#eaffef" />
+      <stop offset="0.45" stop-color="#7dffa0" />
+      <stop offset="1" stop-color="#39ff6a" stop-opacity="0" />
+    </radialGradient>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="6" result="blur" />
+      <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
+    </filter>
+    <filter id="soft" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="2.5" result="blur" />
+      <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
+    </filter>
+  </defs>
+
+  <rect width="1200" height="360" rx="40" fill="#050806" />
+
+  <!-- The mark, scaled down from logo-mark.svg. -->
+  <g transform="translate(40 30) scale(0.6)" fill="none" stroke="#39ff6a" stroke-linecap="round" stroke-linejoin="round">
+    <g stroke-width="14" filter="url(#soft)">
+      <circle cx="160" cy="268" r="96" />
+      <circle cx="352" cy="268" r="96" />
+      <path d="M232 205 Q256 186 280 205" />
+      <path d="M64 252 L44 214" />
+      <path d="M448 252 L468 214" />
+    </g>
+    <g filter="url(#glow)">
+      <circle cx="160" cy="268" r="62" stroke-width="15" stroke-dasharray="22 16.96" transform="rotate(-90 160 268)" />
+      <circle cx="160" cy="268" r="38" stroke-width="3" opacity="0.6" />
+    </g>
+    <circle cx="160" cy="268" r="34" fill="url(#core)" stroke="none" />
+    <g stroke-width="7" opacity="0.95">
+      <path d="M302 222 v-14 h18 M402 222 v-14 h-18 M302 314 v14 h18 M402 314 v14 h-18" />
+    </g>
+    <g stroke-width="9" filter="url(#soft)">
+      <path d="M318 242 h56" />
+      <path d="M318 268 h68" />
+      <path d="M318 294 h40" />
+    </g>
+  </g>
+
+  <!-- Wordmark. -->
+  <g font-family="'JetBrains Mono', Consolas, 'SF Mono', Menlo, monospace" fill="#39ff6a">
+    <text x="410" y="150" font-size="44" letter-spacing="18" fill="#7fa58a">EVEN</text>
+    <text x="404" y="238" font-size="96" font-weight="700" letter-spacing="14" filter="url(#soft)">EDITH</text>
+    <text x="410" y="290" font-size="22" letter-spacing="7" fill="#7fa58a">AI FOR YOUR GLASSES</text>
+  </g>
+</svg>
