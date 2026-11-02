@@ -23,7 +23,7 @@ const NOT_NAMES = new Set(['the', 'and', 'with', 'call', 'meeting', 'lunch', 'di
 type Travel = { minutes: number; to: string } | null
 
 /**
- * Alerts EDITH raises without being asked: rain on the way, time to leave for
+ * Alerts Jarvis raises without being asked: rain on the way, time to leave for
  * an event, briefs before meetings, and location reminders. Called from the
  * assistant's once-a-second tick; each check throttles itself.
  */

@@ -62,7 +62,7 @@ test('tipSplit', () => {
 
 test('quickAnswer: phrasings it should answer', () => {
   assert.equal(quickAnswer("What's 15% of 80?"), '12.')
-  assert.equal(quickAnswer('EDITH, what is 12 times 12'), '144.')
+  assert.equal(quickAnswer('Jarvis, what is 12 times 12'), '144.')
   assert.equal(quickAnswer('5 miles in km'), '5 miles is 8.0467 km.')
   assert.equal(quickAnswer('how many feet in 3 metres'), '3 metres is 9.8425 feet.')
   assert.equal(quickAnswer('split £84 between 3 with a 12% tip'), '£31.36 each, £94.08 total with a £10.08 tip.')

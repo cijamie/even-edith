@@ -2,7 +2,7 @@ import type { Store } from '../store'
 import { VERSION } from '../version'
 import { saveFile } from './expenses-ui'
 
-// Everything EDITH stores, except caches and usage counters.
+// Everything Jarvis stores, except caches and usage counters.
 const DATA_KEYS = [
   'edith.homeCity', 'edith.briefingTime', 'edith.teleprompter', 'edith.guide', 'edith.persona', 'edith.handsFree',
   'edith.calendarUrl', 'edith.proactive', 'edith.smartHome', 'edith.agenda', 'edith.memory', 'edith.lists',
@@ -45,7 +45,7 @@ export function mountBackup(root: HTMLElement, store: Store) {
     if (!file) return
     try {
       const backup = JSON.parse(await file.text())
-      if (backup?.app !== 'even-edith' || typeof backup.data !== 'object') throw new Error('not an EDITH backup')
+      if (backup?.app !== 'even-edith' || typeof backup.data !== 'object') throw new Error('not a Jarvis backup')
       const entries = Object.entries(backup.data as Record<string, unknown>).filter(
         ([k, v]) => [...DATA_KEYS, ...KEY_KEYS].includes(k) && typeof v === 'string',
       ) as [string, string][]

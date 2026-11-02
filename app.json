@@ -1,14 +1,14 @@
 {
   "package_id": "com.cijamie.evenjarvis",
   "edition": "202601",
-  "name": "Even EDITH",
-  "version": "0.6.2",
+  "name": "Jarvis",
+  "version": "0.7.0",
   "min_sdk_version": "0.0.16",
   "entrypoint": "index.html",
   "permissions": [
     {
       "name": "network",
-      "desc": "Voice (Groq); answers and search (Gemini); weather (Open-Meteo); rates; maps (Esri/OSM); places and routes (Photon, Nominatim, OSRM, Overpass); transit; scores; crypto; aircraft (adsbdb); ISS; facts (Wikipedia, DuckDuckGo); your Google Apps Script (calendar, planes); your smart home webhooks.",
+      "desc": "Voice (Groq); answers and search (Gemini); weather (Open-Meteo); rates; maps (Esri/OSM); places and routes (OSM, OSRM, Photon); transit; scores; crypto; aircraft (adsbdb, adsb.lol); ISS; facts (Wikipedia, DuckDuckGo); OSM links; your Google Apps Script (calendar, planes); smart home webhooks.",
       "whitelist": [
         "https://api.groq.com",
         "https://generativelanguage.googleapis.com",
@@ -17,6 +17,7 @@
         "https://open.er-api.com",
         "https://services.arcgisonline.com",
         "https://nominatim.openstreetmap.org",
+        "https://www.openstreetmap.org",
         "https://photon.komoot.io",
         "https://en.wikipedia.org",
         "https://api.duckduckgo.com",
@@ -27,6 +28,7 @@
         "https://script.google.com",
         "https://script.googleusercontent.com",
         "https://api.adsbdb.com",
+        "https://api.adsb.lol",
         "https://api.wheretheiss.at",
         "https://overpass-api.de",
         "https://hooks.nabu.casa",
@@ -35,7 +37,7 @@
     },
     {
       "name": "g2-microphone",
-      "desc": "Records from the glasses microphones while you talk to EDITH, for live captions, meeting notes and the voice-following teleprompter, and, if you turn on hands-free, to listen for \"EDITH\"."
+      "desc": "Records from the glasses microphones while you talk to Jarvis, for live captions, meeting notes and the voice-following teleprompter, and, if you turn on hands-free, to listen for \"Jarvis\"."
     },
     {
       "name": "location",

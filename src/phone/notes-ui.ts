@@ -14,14 +14,14 @@ export function mountNotes(root: HTMLElement, agenda: Agenda) {
               </span></li>`,
           )
           .join('')}</ul>`
-      : '<p class="hint">Nothing yet. Say "EDITH, take a note…", or record a meeting.</p>'
+      : '<p class="hint">Nothing yet. Say "Jarvis, take a note…", or record a meeting.</p>'
 
     root.querySelectorAll<HTMLButtonElement>('[data-share]').forEach((b) =>
       b.addEventListener('click', async () => {
         const text = agenda.notes.find((n) => n.id === b.dataset.share)?.text ?? ''
         // The share sheet sends it to email, messages and so on; otherwise copy.
         try {
-          if (navigator.share) return await navigator.share({ title: 'From EDITH', text })
+          if (navigator.share) return await navigator.share({ title: 'From Jarvis', text })
         } catch (err) {
           if ((err as DOMException)?.name === 'AbortError') return
         }

@@ -24,7 +24,7 @@ export function mountFlashcards(root: HTMLElement, decks: Decks, practise: (deck
               <button type="button" data-del="${d.id}">Delete</button></span></li>`,
           )
           .join('')}</ul>`
-      : '<p class="hint">No decks yet. Paste cards below, or say "EDITH, make flashcards on capital cities".</p>'
+      : '<p class="hint">No decks yet. Paste cards below, or say "Jarvis, make flashcards on capital cities".</p>'
     list.querySelectorAll<HTMLButtonElement>('[data-go]').forEach((b) => b.addEventListener('click', () => practise(b.dataset.go!)))
     list.querySelectorAll<HTMLButtonElement>('[data-del]').forEach((b) =>
       b.addEventListener('click', () => confirm('Delete this deck?') && void decks.removeDeck(b.dataset.del!)),

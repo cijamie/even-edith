@@ -71,7 +71,7 @@ export class Settings {
     return this.store.set('edith.guide', text)
   }
 
-  /** 'edith' | 'friday' | 'jarvis' ('' means EDITH). */
+  /** 'edith' | 'friday' | 'jarvis' ('' means jarvis). */
   persona(): Promise<string> {
     return this.store.get('edith.persona')
   }
@@ -80,7 +80,7 @@ export class Settings {
     return this.store.set('edith.persona', id)
   }
 
-  /** "EDITH, …" wake word: '1' on, '' off. */
+  /** "Jarvis, …" wake word: '1' on, '' off. */
   async handsFree(): Promise<boolean> {
     return (await this.store.get('edith.handsFree')) === '1'
   }

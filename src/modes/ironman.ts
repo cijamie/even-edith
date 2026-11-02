@@ -63,7 +63,7 @@ export class IronManMode implements Mode {
     void display.set(ID.header, '● SUIT ONLINE')
     await sleep(2200)
 
-    // Act 3: back to the HUD for EDITH's verdict.
+    // Act 3: back to the HUD for Jarvis's verdict.
     if (this.running) await this.host.finish("Suit integrity 100%. Repulsors charged. Do try not to fly into anything.", 'SUIT UP COMPLETE')
   }
 

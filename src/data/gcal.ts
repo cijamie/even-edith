@@ -9,7 +9,7 @@ const SYNC_MS = 15 * 60_000
  * account. Google's calendar feeds block browser requests; an Apps Script web
  * app doesn't, and needs no OAuth client.
  */
-export const APPS_SCRIPT = `// Even EDITH calendar bridge. Deploy > New deployment > Web app,
+export const APPS_SCRIPT = `// Jarvis calendar bridge. Deploy > New deployment > Web app,
 // Execute as: Me, Who has access: Anyone. Keep the URL private.
 function doGet(e) {
   // Aircraft near a point, for "what plane is that?" (ADS-B feeds block browser requests).

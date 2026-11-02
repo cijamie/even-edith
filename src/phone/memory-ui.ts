@@ -1,6 +1,6 @@
 import type { Memory } from '../data/memory'
 
-/** What EDITH has been asked to remember, with a way to forget each item. */
+/** What Jarvis has been asked to remember, with a way to forget each item. */
 export function mountMemory(root: HTMLElement, memory: Memory) {
   const render = () => {
     const facts = memory.all
@@ -8,7 +8,7 @@ export function mountMemory(root: HTMLElement, memory: Memory) {
       ? `<ul class="facts">${facts
           .map((f) => `<li><span>${escape(f.text)}</span><button type="button" data-id="${f.id}" aria-label="Forget">Forget</button></li>`)
           .join('')}</ul>`
-      : '<p class="hint">Nothing yet. Say "EDITH, remember that…".</p>'
+      : '<p class="hint">Nothing yet. Say "Jarvis, remember that…".</p>'
     root.querySelectorAll<HTMLButtonElement>('[data-id]').forEach((b) =>
       b.addEventListener('click', async () => {
         await memory.remove(b.dataset.id!)

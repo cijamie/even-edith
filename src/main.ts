@@ -165,5 +165,5 @@ async function greeting() {
   const missing = [!keys.groq && 'Groq', !keys.gemini && 'Gemini'].filter(Boolean)
   if (!missing.length) return (await settings.handsFree()) ? 'All systems nominal. Say my name or hold to speak.' : 'All systems nominal. Hold to speak.'
   const [noun, pronoun] = missing.length > 1 ? ['keys', 'them'] : ['key', 'it']
-  return `I'm missing my ${missing.join(' and ')} ${noun}. Open Even EDITH on your phone to add ${pronoun}.`
+  return `I'm missing my ${missing.join(' and ')} ${noun}. Open Jarvis on your phone to add ${pronoun}.`
 }

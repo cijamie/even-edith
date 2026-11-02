@@ -307,15 +307,15 @@ const tools: Record<string, Tool> = {
 
   set_hands_free: view(
     'set_hands_free',
-    'Turn the hands-free wake word (saying "EDITH") on or off.',
+    'Turn the hands-free wake word (saying "Jarvis") on or off.',
     ({ on }) => ({ type: 'handsfree', on: !!on }),
     obj({ on: { type: 'boolean' } }, ['on']),
   ),
 
   set_personality: view(
     'set_personality',
-    'Switch the assistant personality: edith (dry, tactical), friday (warm, Irish), jarvis (formal, British butler).',
-    ({ name }) => ({ type: 'persona', id: PERSONA_IDS.includes(name) ? name : 'edith' }),
+    'Switch the assistant personality: jarvis (formal, British butler), edith (dry, tactical), friday (warm, Irish).',
+    ({ name }) => ({ type: 'persona', id: PERSONA_IDS.includes(name) ? name : 'jarvis' }),
     obj({ name: { type: 'string', enum: PERSONA_IDS } }, ['name']),
   ),
 

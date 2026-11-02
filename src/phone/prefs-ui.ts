@@ -47,13 +47,13 @@ export async function mountPrefs(root: HTMLElement, settings: Settings, onChange
     </div>
     <div class="key">
       <div class="key-head">
-        <label for="handsfree">Hands-free ("EDITH, …")</label>
+        <label for="handsfree">Hands-free ("Jarvis, …")</label>
         <input id="handsfree" type="checkbox" class="toggle" />
       </div>
       <p class="hint">
-        Start with her name: "EDITH, what's the weather?" or "OK EDITH". Don't say "Hey EDITH":
+        Start with the name: "Jarvis, what's the weather?" or "OK Jarvis". Don't say "Hey Jarvis":
         "Hey E…" wakes the glasses' own Even AI assistant instead.
-        Keeps the glasses mic on while EDITH is open and listens for her name, so it uses more battery.
+        Keeps the glasses mic on while Jarvis is open and listens for the name, so it uses more battery.
         Each phrase you say is sent to Groq to check for the name (speech the app tags as someone else is skipped),
         which counts against Groq's free daily quota. Works only while the app is open on the glasses.
       </p>
@@ -64,13 +64,13 @@ export async function mountPrefs(root: HTMLElement, settings: Settings, onChange
         <input id="proactive" type="checkbox" class="toggle" />
       </div>
       <p class="hint">
-        EDITH speaks first: rain on the way, when to leave for an event with a location, and who you're meeting.
+        Jarvis speaks first: rain on the way, when to leave for an event with a location, and who you're meeting.
         Checks the weather every 10 minutes while the app is open.
       </p>
     </div>`
   root.append(extra)
   const select = extra.querySelector<HTMLSelectElement>('#persona')!
-  select.value = (await settings.persona()) || 'edith'
+  select.value = (await settings.persona()) || 'jarvis'
   select.addEventListener('change', async () => {
     await settings.setPersona(select.value)
     onChange()

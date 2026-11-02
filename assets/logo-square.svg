@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
-  <title>Even EDITH</title>
+  <title>Jarvis</title>
   <defs>
     <radialGradient id="bg" cx="50%" cy="38%" r="75%">
       <stop offset="0" stop-color="#0d1a11" />
@@ -49,8 +49,8 @@
 
   <!-- Wordmark. Letter-spacing adds space after the last letter too, so x is nudged by half of it. -->
   <g font-family="'JetBrains Mono', Consolas, 'SF Mono', Menlo, monospace" text-anchor="middle">
-    <text x="527" y="690" font-size="58" letter-spacing="30" fill="#7fa58a">EVEN</text>
-    <text x="524" y="842" font-size="172" font-weight="700" letter-spacing="24" fill="#39ff6a" filter="url(#soft)">EDITH</text>
+    <text x="527" y="690" font-size="58" letter-spacing="30" fill="#7fa58a">STARK</text>
+    <text x="524" y="842" font-size="172" font-weight="700" letter-spacing="24" fill="#39ff6a" filter="url(#soft)">JARVIS</text>
     <line x1="292" y1="896" x2="732" y2="896" stroke="#1d3324" stroke-width="4" />
   </g>
 </svg>

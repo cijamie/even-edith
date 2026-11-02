@@ -11,7 +11,7 @@ const MAX_SECONDS = 9
 export type Utterance = { wav: Blob; seconds: number }
 
 /**
- * Always-on listening for "EDITH, …" ("Hey EDITH" also matches, but the glasses'
+ * Always-on listening for "Jarvis, …" ("Hey Jarvis" also matches, but the glasses'
  * own "Hey Even" wake word usually grabs that first). There's no on-device keyword spotter,
  * so this does the cheap part locally: it waits for a burst of speech, cuts it
  * at the pause, and hands it over for transcription. Bursts the Even app marks
@@ -99,7 +99,7 @@ export class WakeListener {
 }
 
 const WAKE =
-  /^(?:(?:hey|hi|hay|ok|okay|a|yo)[\s,]+)?(?:edith|edit|eadie|edie|eddie|ed ith|edith's|aditi|friday|jarvis|jervis|travis)\b[\s,.!?]*(.*)$/i
+  /^(?:(?:hey|hi|hay|ok|okay|a|yo)[\s,]+)?(?:edith|edit|eadie|edie|eddie|ed ith|edith's|aditi|friday|jarvis|jarvis's|jarvas|javis|jervis|travis)\b[\s,.!?]*(.*)$/i
 // Without "hey", only the full names count: plain "edit ..." is too common in speech.
 const BARE = /^(?:edith|friday|jarvis)\b/i
 

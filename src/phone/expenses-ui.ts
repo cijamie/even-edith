@@ -16,7 +16,7 @@ export function mountExpenses(root: HTMLElement, expenses: Expenses) {
                   <button type="button" data-id="${e.id}">Delete</button></li>`,
               )
               .join('')}</ul>`
-          : '<p class="hint">Nothing this week. Say "EDITH, I spent £12 on lunch".</p>'
+          : '<p class="hint">Nothing this week. Say "Jarvis, I spent £12 on lunch".</p>'
       }
       <div class="actions"><button type="button" class="export"${expenses.all.length ? '' : ' disabled'}>Export CSV</button></div>`
     root.querySelectorAll<HTMLButtonElement>('[data-id]').forEach((b) => b.addEventListener('click', () => void expenses.remove(b.dataset.id!)))

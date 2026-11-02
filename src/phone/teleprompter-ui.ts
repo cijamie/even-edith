@@ -1,6 +1,6 @@
 import type { Settings } from '../settings'
 
-/** Paste a script here; "EDITH, open teleprompter" (or the button) shows it on the glasses. */
+/** Paste a script here; "Jarvis, open teleprompter" (or the button) shows it on the glasses. */
 export async function mountTeleprompter(root: HTMLElement, settings: Settings, show: (follow: boolean) => void) {
   root.innerHTML = `
     <textarea rows="6" placeholder="Paste a speech, notes or a list" aria-label="Teleprompter script"></textarea>

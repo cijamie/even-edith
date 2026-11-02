@@ -79,7 +79,7 @@ export function mountMirror(root: HTMLElement, display: Display, remote: Remote)
         <button type="button" data-ev="down" aria-label="Swipe down">Swipe ▼</button>
       </div>
       <form class="field ask">
-        <input type="text" placeholder="Type to EDITH" aria-label="Type a request to EDITH" />
+        <input type="text" placeholder="Type to Jarvis" aria-label="Type a request to Jarvis" />
         <button type="submit">Send</button>
       </form>
       <details class="shortcuts">
@@ -192,7 +192,7 @@ export function mountMirror(root: HTMLElement, display: Display, remote: Remote)
   )
 
   root.querySelector('.exit')!.addEventListener('click', () => {
-    if (confirm('Close EDITH on the glasses?')) remote.event(sys(OsEventTypeList.DOUBLE_CLICK_EVENT))
+    if (confirm('Close Jarvis on the glasses?')) remote.event(sys(OsEventTypeList.DOUBLE_CLICK_EVENT))
   })
 }
 

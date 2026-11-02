@@ -7,7 +7,7 @@ import { coach } from '../src/voice/coach.ts'
 
 test('parseExpense', () => {
   assert.deepEqual(parseExpense('I spent £12 on lunch'), { amount: 12, currency: 'GBP', what: 'lunch' })
-  assert.deepEqual(parseExpense('EDITH, spent 4.50 on a coffee.'), { amount: 4.5, currency: undefined, what: 'coffee' })
+  assert.deepEqual(parseExpense('Jarvis, spent 4.50 on a coffee.'), { amount: 4.5, currency: undefined, what: 'coffee' })
   assert.deepEqual(parseExpense('I just paid 30 euros for petrol'), { amount: 30, currency: 'EUR', what: 'petrol' })
   assert.deepEqual(parseExpense('paid $8,99 for the cinema'), { amount: 8.99, currency: 'USD', what: 'cinema' })
   assert.equal(parseExpense('how much did I spend this week'), null)

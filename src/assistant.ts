@@ -49,8 +49,8 @@ const HUD_CHROME = { [ID.tl]: GLYPHS.tl, [ID.tr]: GLYPHS.tr, [ID.bl]: GLYPHS.bl,
 const NUDGE_LEAD_MS = 10 * 60_000
 // Wake checks share Groq's free requests-per-minute with everything else; leave room.
 const WAKE_GAP_MS = Math.ceil(60_000 / (GROQ_FREE.requestsPerMinute - 6))
-// The name alone, not "Hey EDITH": the glasses' own "Hey Even" wake word fires on "Hey E...".
-const WAKE_PROMPT = 'EDITH.'
+// The name alone, not "Hey Jarvis": the glasses' own "Hey Even" wake word fires on "Hey E...".
+const WAKE_PROMPT = 'Jarvis.'
 
 // Handled locally so these open instantly, without a round trip to Gemini.
 const FAST: [RegExp, Action | 'close'][] = [
@@ -93,7 +93,7 @@ export type Deps = {
  * Ring-to-talk loop: hold to record, release to transcribe (Groq Whisper),
  * ask (Gemini), then type the answer out with swipe paging. A single press also
  * starts/stops listening, as a fallback for long press. With hands-free on,
- * saying "EDITH" (or "OK EDITH") does the same without touching the ring.
+ * saying "Jarvis" (or "OK Jarvis") does the same without touching the ring.
  * Also owns the dashboard, full-screen modes, protocols, alerts and briefings.
  */
 export class Assistant {
@@ -118,7 +118,7 @@ export class Assistant {
   private briefingCheck = false
   private host: Host
   private live = false
-  private persona: PersonaId = 'edith'
+  private persona: PersonaId = 'jarvis'
   private handsFree = false
   private wakeBusy = false
   private lastWakeRequest = 0
@@ -209,7 +209,7 @@ export class Assistant {
   /** Re-reads personality and hands-free after the phone settings change. */
   async loadPrefs() {
     const previous = this.persona
-    this.persona = ((await this.settings.persona()) || 'edith') as PersonaId
+    this.persona = ((await this.settings.persona()) || 'jarvis') as PersonaId
     this.handsFree = await this.settings.handsFree()
     if (previous !== this.persona) this.brain.reset()
     if (!this.live) return
@@ -299,7 +299,7 @@ export class Assistant {
     }
   }
 
-  /** Show a message as EDITH's reply (also used for the boot greeting and errors). */
+  /** Show a message as Jarvis's reply (also used for the boot greeting and errors). */
   async say(text: string) {
     this.view = 'answer'
     this.pages = paginate(text)
@@ -653,7 +653,7 @@ export class Assistant {
       console.log(`[wake] "${said}" →`, command === null ? 'no wake' : `"${command}"`)
       if (command === null || this.state !== 'idle') return
       if (command.split(/\s+/).filter(Boolean).length >= 2) {
-        // "EDITH, what's the weather" in one breath: answer it directly.
+        // "Jarvis, what's the weather" in one breath: answer it directly.
         await this.handleText(command)
       } else {
         if (this.mode) await this.closeMode()
@@ -802,7 +802,7 @@ export class Assistant {
   }
 }
 
-/** Lowercase, no punctuation, and no leading "EDITH," so "EDITH, open dashboard." matches. */
+/** Lowercase, no punctuation, and no leading "Jarvis," so "Jarvis, open dashboard." matches. */
 const normalise = (s: string) =>
   s
     .toLowerCase()

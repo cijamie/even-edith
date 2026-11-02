@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 360" width="1200" height="360">
-  <title>Even EDITH</title>
+  <title>Jarvis</title>
   <defs>
     <radialGradient id="core" cx="50%" cy="50%" r="50%">
       <stop offset="0" stop-color="#eaffef" />
@@ -44,8 +44,8 @@
 
   <!-- Wordmark. -->
   <g font-family="'JetBrains Mono', Consolas, 'SF Mono', Menlo, monospace" fill="#39ff6a">
-    <text x="410" y="150" font-size="44" letter-spacing="18" fill="#7fa58a">EVEN</text>
-    <text x="404" y="238" font-size="96" font-weight="700" letter-spacing="14" filter="url(#soft)">EDITH</text>
+    <text x="410" y="150" font-size="44" letter-spacing="18" fill="#7fa58a">STARK</text>
+    <text x="404" y="238" font-size="96" font-weight="700" letter-spacing="14" filter="url(#soft)">JARVIS</text>
     <text x="410" y="290" font-size="22" letter-spacing="7" fill="#7fa58a">AI FOR YOUR GLASSES</text>
   </g>
 </svg>

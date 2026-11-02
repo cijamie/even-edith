@@ -82,7 +82,7 @@ async function fromOverpass(fix: Fix): Promise<Found[]> {
 }
 
 /**
- * "EDITH, emergency": nearest A&E, pharmacy, police and defibrillator, the
+ * "Jarvis, emergency": nearest A&E, pharmacy, police and defibrillator, the
  * local emergency number, and a pinned map link saved to notes for sharing
  * from the phone. Press to walk to the nearest A&E.
  */

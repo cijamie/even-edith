@@ -1,14 +1,14 @@
 {
-  "name": "even-edith",
+  "name": "jarvis",
   "private": true,
-  "version": "0.6.2",
+  "version": "0.7.0",
   "type": "module",
   "scripts": {
     "dev": "vite --host",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview --host",
     "sim": "evenhub-simulator http://localhost:5173",
-    "pack": "npm run build && evenhub pack app.json dist -o even-edith.ehpk",
+    "pack": "npm run build && evenhub pack app.json dist -o jarvis.ehpk",
     "test": "node --experimental-transform-types --no-warnings --test \"test/*.test.ts\""
   },
   "dependencies": {

@@ -28,7 +28,7 @@ export function mountLists(root: HTMLElement, lists: Lists, show: (name: string)
           </div>`,
             )
             .join('')
-        : '<p class="hint">No lists yet. Say "EDITH, add milk and eggs to my shopping list", or start one here.</p>') +
+        : '<p class="hint">No lists yet. Say "Jarvis, add milk and eggs to my shopping list", or start one here.</p>') +
       `<form class="field new"><input type="text" placeholder="New list name" aria-label="New list name" /><button type="submit">Create</button></form>`
 
     root.querySelectorAll<HTMLElement>('[data-list]').forEach((el) => {

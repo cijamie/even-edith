@@ -1,4 +1,4 @@
-EDITH is a voice assistant for your G2 that lives on the display. Hold the ring and ask, or turn on hands-free and just say "EDITH, ...". Answers type out on the HUD in a dry, to-the-point voice, with Google Search for anything current.
+Jarvis is a voice assistant for your G2 that lives on the display. Hold the ring and ask, or turn on hands-free and just say "Jarvis, ...". Answers type out on the HUD in a polite, to-the-point voice, with Google Search for anything current.
 
 ASK ANYTHING
 News, prices, scores, flight status, quick facts. Maths, tips, bill splits and unit conversions answer instantly, even offline.
@@ -19,6 +19,6 @@ AND MORE
 Spending log ("I spent 12 pounds on lunch"), smart home control through Home Assistant or IFTTT, an emergency screen with the nearest hospital, police and pharmacy, a walk and run tracker, three personalities, and a phone remote that mirrors the display.
 
 BRING YOUR OWN KEYS
-EDITH uses free tiers: paste your own Gemini and Groq API keys into the phone app. Keys and data stay on your phone.
+Jarvis uses free tiers: paste your own Gemini and Groq API keys into the phone app. Keys and data stay on your phone.
 
 A fan project, not affiliated with Marvel or Disney.

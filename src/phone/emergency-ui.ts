@@ -4,7 +4,7 @@ import { emergencyNumber, mapLink } from '../modes/emergency'
 /** "Share my location" for emergencies, plus a shortcut to emergency protocol on the glasses. */
 export function mountEmergency(root: HTMLElement, locator: Locator, protocol: () => void) {
   root.innerHTML = `
-    <p class="hint">Emergency number here: <b>${emergencyNumber()}</b>. EDITH can't call for you.</p>
+    <p class="hint">Emergency number here: <b>${emergencyNumber()}</b>. Jarvis can't call for you.</p>
     <div class="actions">
       <button type="button" class="primary share">Share my location</button>
       <button type="button" class="protocol">Emergency protocol on glasses</button>

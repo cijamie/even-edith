@@ -1,7 +1,7 @@
 import type { Settings } from '../settings'
 import { allowedHook, parseHooks } from '../tools/home'
 
-/** Named webhooks for "EDITH, lights off": Home Assistant Cloud or IFTTT. */
+/** Named webhooks for "Jarvis, lights off": Home Assistant Cloud or IFTTT. */
 export async function mountSmartHome(root: HTMLElement, settings: Settings) {
   root.innerHTML = `
     <details>
@@ -12,7 +12,7 @@ export async function mountSmartHome(root: HTMLElement, settings: Settings) {
         <li><b>IFTTT</b>: a Webhooks applet; its <code>maker.ifttt.com/trigger/…</code> URL gets the command as <code>value1</code>.</li>
         <li>Add one line per device or scene: <code>Lights | https://hooks.nabu.casa/…</code></li>
       </ol>
-      <p class="hint">Anyone with a webhook URL can trigger it, so keep them private. Only those two services are allowed, as the Even app limits which sites EDITH can reach.</p>
+      <p class="hint">Anyone with a webhook URL can trigger it, so keep them private. Only those two services are allowed, as the Even app limits which sites Jarvis can reach.</p>
     </details>
     <textarea rows="4" spellcheck="false" autocapitalize="off" placeholder="Lights | https://hooks.nabu.casa/…" aria-label="Smart home webhooks"></textarea>
     <div class="actions"><button type="button" class="primary save" disabled>Save</button></div>
@@ -34,7 +34,7 @@ export async function mountSmartHome(root: HTMLElement, settings: Settings) {
     save.disabled = true
     msg.textContent = bad.length
       ? `Saved, but ${bad.map((h) => h.name).join(', ')} won't work: only hooks.nabu.casa and maker.ifttt.com URLs are allowed.`
-      : `Saved ${hooks.length} webhook${hooks.length === 1 ? '' : 's'}. Try "EDITH, ${hooks[0]?.name.toLowerCase() ?? 'lights'} off".`
+      : `Saved ${hooks.length} webhook${hooks.length === 1 ? '' : 's'}. Try "Jarvis, ${hooks[0]?.name.toLowerCase() ?? 'lights'} off".`
     msg.className = `msg ${bad.length ? 'warn' : 'ok'}`
   })
 }

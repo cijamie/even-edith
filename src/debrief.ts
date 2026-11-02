@@ -5,7 +5,7 @@ import { periodStart } from './data/expenses'
 import { clock, isSameDay } from './util/time'
 
 /**
- * "EDITH, debrief": the day in a few lines, from what's on the phone. Works
+ * "Jarvis, debrief": the day in a few lines, from what's on the phone. Works
  * offline: meetings and activities from notes, spending, open list items,
  * and tomorrow's first event.
  */

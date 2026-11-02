@@ -42,7 +42,7 @@ export type Host = {
   decks: Decks
   /** Status lines for the diagnostics screen. */
   diagnostics(): Promise<string[]>
-  /** Leave the mode and show `text` as EDITH's reply (header defaults to the banner). */
+  /** Leave the mode and show `text` as Jarvis's reply (header defaults to the banner). */
   finish(text: string, header?: string): Promise<void>
   /** Leave this mode for another view or mode (e.g. emergency → navigation). */
   run(action: Action): Promise<void>

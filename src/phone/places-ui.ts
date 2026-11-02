@@ -14,7 +14,7 @@ export function mountPlaces(root: HTMLElement, pins: Pins) {
           ? `<ul class="facts">${gs
               .map((g) => `<li><span>${escape(g.text)} <small>· at ${escape(g.place)}</small></span><button type="button" data-geo="${g.id}">Delete</button></li>`)
               .join('')}</ul>`
-          : '<p class="hint">None. Say "EDITH, remind me to buy batteries when I get to Tesco".</p>'
+          : '<p class="hint">None. Say "Jarvis, remind me to buy batteries when I get to Tesco".</p>'
       }
       <h3 class="sub">Pins</h3>
       ${
@@ -26,7 +26,7 @@ export function mountPlaces(root: HTMLElement, pins: Pins) {
                   <button type="button" data-pin="${p.id}">Delete</button></span></li>`,
               )
               .join('')}</ul>`
-          : '<p class="hint">None. Say "EDITH, I parked here", then later "take me back to the car".</p>'
+          : '<p class="hint">None. Say "Jarvis, I parked here", then later "take me back to the car".</p>'
       }`
     root.querySelectorAll<HTMLButtonElement>('[data-geo]').forEach((b) => b.addEventListener('click', () => void pins.remove('geofences', b.dataset.geo!)))
     root.querySelectorAll<HTMLButtonElement>('[data-pin]').forEach((b) => b.addEventListener('click', () => void pins.remove('pins', b.dataset.pin!)))

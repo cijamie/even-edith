@@ -1,6 +1,6 @@
 import type { Settings } from '../settings'
 
-/** Paste a recipe or how-to, one step per line; "EDITH, start my recipe" (or the button) walks through it. */
+/** Paste a recipe or how-to, one step per line; "Jarvis, start my recipe" (or the button) walks through it. */
 export async function mountGuide(root: HTMLElement, settings: Settings, show: () => void) {
   root.innerHTML = `
     <textarea rows="6" placeholder="Title on the first line, then one step per line. Times like &quot;bake 20 minutes&quot; get a timer." aria-label="Recipe or guide"></textarea>
