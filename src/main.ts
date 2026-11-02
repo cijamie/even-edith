@@ -66,8 +66,8 @@ if (new URLSearchParams(location.search).has('probe')) {
 } else {
   const display = new Display(bridge)
   const assistant = new Assistant(bridge, display, settings, { agenda, memory, locator, usage, lists, transcript, calendar, pins, expenses, decks })
-  // Dev hook: drive the assistant from the console, e.g. edith.handleText('open dashboard').
-  if (import.meta.env.DEV) Object.assign(window, { edith: assistant })
+  // Dev hook: drive the assistant from the console, e.g. jarvis.handleText('open dashboard').
+  if (import.meta.env.DEV) Object.assign(window, { jarvis: assistant })
 
   let ready = false
   bridge.onEvenHubEvent((event) => {

@@ -1,4 +1,4 @@
-Jarvis is a voice assistant for your G2 that lives on the display. Hold the ring and ask, or turn on hands-free and just say "Jarvis, ...". Answers type out on the HUD in a polite, to-the-point voice, with Google Search for anything current.
+Jarvis is a voice assistant for your G2 that lives on the display. Hold the ring and ask, or turn on hands-free and just say "Jarvis, what's the weather?". Answers type out on the HUD in a polite, unflappable British voice, with Google Search for anything current.
 
 ASK ANYTHING
 News, prices, scores, flight status, quick facts. Maths, tips, bill splits and unit conversions answer instantly, even offline.
@@ -16,7 +16,7 @@ ON STAGE AND IN THE KITCHEN
 A teleprompter that follows your voice and turns the page as you read. Recipes and how-tos one step per screen, with a timer for each step. Flashcards with spaced repetition.
 
 AND MORE
-Spending log ("I spent 12 pounds on lunch"), smart home control through Home Assistant or IFTTT, an emergency screen with the nearest hospital, police and pharmacy, a walk and run tracker, three personalities, and a phone remote that mirrors the display.
+Spending log ("I spent 12 pounds on lunch"), smart home control through Home Assistant or IFTTT, an emergency screen with the nearest hospital, police and pharmacy, a walk and run tracker, two more personalities to switch to (EDITH and FRIDAY), and a phone remote that mirrors the display.
 
 BRING YOUR OWN KEYS
 Jarvis uses free tiers: paste your own Gemini and Groq API keys into the phone app. Keys and data stay on your phone.
