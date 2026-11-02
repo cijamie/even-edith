@@ -9,114 +9,145 @@
   <body>
     <main id="phone">
       <header class="masthead">
-        <h1>EVEN EDITH</h1>
-        <p id="status" class="status">Connecting to glasses…</p>
+        <div>
+          <h1>EVEN EDITH</h1>
+          <p id="status" class="status">Connecting to glasses…</p>
+        </div>
+        <button type="button" class="sos" data-tab="sos" aria-label="Emergency">SOS</button>
       </header>
 
-      <section class="card" aria-labelledby="mirror-title">
-        <h2 id="mirror-title">Glasses</h2>
-        <p class="hint">A live copy of the display. Use the controls to drive the glasses while someone else wears them.</p>
-        <div id="mirror"></div>
-      </section>
+      <!-- Glasses: the live mirror and remote. -->
+      <div class="panel" data-panel="glasses">
+        <section class="card" aria-labelledby="mirror-title">
+          <h2 id="mirror-title">Glasses</h2>
+          <p class="hint">A live copy of the display. Drive the glasses from here while someone else wears them.</p>
+          <div id="mirror"></div>
+        </section>
+      </div>
 
-      <section class="card" aria-labelledby="keys-title">
-        <h2 id="keys-title">API keys</h2>
-        <p class="hint">
-          Your keys stay on this phone and are sent only to Google and Groq.
-          Both have free tiers.
+      <!-- Organiser: things EDITH keeps for you. -->
+      <div class="panel" data-panel="organiser" hidden>
+        <section class="card" aria-labelledby="lists-title">
+          <h2 id="lists-title">Lists</h2>
+          <div id="lists"></div>
+        </section>
+
+        <section class="card" aria-labelledby="notes-title">
+          <h2 id="notes-title">Notes</h2>
+          <p class="hint">Meeting summaries and activity logs land here too.</p>
+          <div id="notes"></div>
+        </section>
+
+        <section class="card" aria-labelledby="expenses-title">
+          <h2 id="expenses-title">Spending</h2>
+          <div id="expenses"></div>
+        </section>
+
+        <section class="card" aria-labelledby="places-title">
+          <h2 id="places-title">Places</h2>
+          <p class="hint">Location reminders fire when you arrive, while EDITH is open. Pins also drop by themselves when a walk or navigation starts.</p>
+          <div id="places"></div>
+        </section>
+
+        <section class="card" aria-labelledby="memory-title">
+          <h2 id="memory-title">Memory</h2>
+          <div id="memory"></div>
+        </section>
+      </div>
+
+      <!-- Studio: things you load onto the glasses. -->
+      <div class="panel" data-panel="studio" hidden>
+        <section class="card" aria-labelledby="tp-title">
+          <h2 id="tp-title">Teleprompter</h2>
+          <p class="hint">"EDITH, open teleprompter", then swipe through it on the glasses.</p>
+          <div id="teleprompter"></div>
+        </section>
+
+        <section class="card" aria-labelledby="guide-title">
+          <h2 id="guide-title">Recipes and guides</h2>
+          <p class="hint">Paste one here, or ask "EDITH, walk me through pancakes". Swipe for steps; press for a step's timer.</p>
+          <div id="guide"></div>
+        </section>
+
+        <section class="card" aria-labelledby="flash-title">
+          <h2 id="flash-title">Flashcards</h2>
+          <p class="hint">Press to flip, swipe down for "got it", up for "again". Cards come back on a spaced schedule.</p>
+          <div id="flashcards"></div>
+        </section>
+      </div>
+
+      <!-- Settings: set up once, each card folds away. -->
+      <div class="panel" data-panel="settings" hidden>
+        <details class="card fold" id="keys-card">
+          <summary><h2>API keys</h2></summary>
+          <p class="hint">Your keys stay on this phone and are sent only to Google and Groq. Both have free tiers.</p>
+          <div id="keys"></div>
+        </details>
+
+        <details class="card fold">
+          <summary><h2>Preferences</h2></summary>
+          <p class="hint">Home city is used for weather and as the map fallback when location is off.</p>
+          <div id="prefs"></div>
+        </details>
+
+        <details class="card fold">
+          <summary><h2>Google Calendar</h2></summary>
+          <p class="hint">Your calendar on the glasses, heads-ups before events, and new events by voice. Also powers "what plane is that?".</p>
+          <div id="calendar"></div>
+        </details>
+
+        <details class="card fold">
+          <summary><h2>Smart home</h2></summary>
+          <p class="hint">"EDITH, lights off." Uses webhooks from Home Assistant Cloud or IFTTT.</p>
+          <div id="smarthome"></div>
+        </details>
+
+        <details class="card fold">
+          <summary><h2>Backup</h2></summary>
+          <p class="hint">Move EDITH to a new phone, or keep a copy before reinstalling.</p>
+          <div id="backup"></div>
+        </details>
+
+        <details class="card fold">
+          <summary><h2>Connection test</h2></summary>
+          <p class="hint">Checks each service from this exact app. Run it inside the Even app on your phone: that's the environment that counts.</p>
+          <div id="diagnostics"></div>
+        </details>
+
+        <p class="credit">
+          Map tiles © Esri, HERE, Garmin, © OpenStreetMap contributors. Places by Photon. Walking routes by OSRM on
+          FOSSGIS servers. Transit by Transitous. Weather by Open-Meteo. Crypto prices by CoinGecko. Scores from ESPN.
+          Aircraft positions from adsb.lol (fetched by your calendar script), routes and types from adsbdb. ISS position from wheretheiss.at. Emergency services from OpenStreetMap via Overpass and Photon.
         </p>
-        <div id="keys"></div>
-      </section>
+      </div>
 
-      <section class="card" aria-labelledby="prefs-title">
-        <h2 id="prefs-title">Preferences</h2>
-        <p class="hint">Home city is used for weather and as the map fallback when location is off.</p>
-        <div id="prefs"></div>
-      </section>
-
-      <section class="card" aria-labelledby="tp-title">
-        <h2 id="tp-title">Teleprompter</h2>
-        <p class="hint">Say "EDITH, open teleprompter" and swipe through it on the glasses.</p>
-        <div id="teleprompter"></div>
-      </section>
-
-      <section class="card" aria-labelledby="guide-title">
-        <h2 id="guide-title">Recipes and guides</h2>
-        <p class="hint">Paste a recipe here, or just ask: "EDITH, walk me through pancakes". Swipe for steps; press to start a step's timer.</p>
-        <div id="guide"></div>
-      </section>
-
-      <section class="card" aria-labelledby="lists-title">
-        <h2 id="lists-title">Lists</h2>
-        <div id="lists"></div>
-      </section>
-
-      <section class="card" aria-labelledby="notes-title">
-        <h2 id="notes-title">Notes</h2>
-        <p class="hint">Meeting summaries and activity logs land here too. Share sends one to email or messages.</p>
-        <div id="notes"></div>
-      </section>
-
-      <section class="card" aria-labelledby="calendar-title">
-        <h2 id="calendar-title">Google Calendar</h2>
-        <p class="hint">Show your Google Calendar on the glasses, with heads-ups before events, and add events by voice.</p>
-        <div id="calendar"></div>
-      </section>
-
-      <section class="card" aria-labelledby="memory-title">
-        <h2 id="memory-title">Memory</h2>
-        <div id="memory"></div>
-      </section>
-
-      <section class="card" aria-labelledby="places-title">
-        <h2 id="places-title">Places</h2>
-        <p class="hint">Location reminders fire when you arrive, while EDITH is open. Pins are dropped by voice, and automatically at the start of walks and navigation.</p>
-        <div id="places"></div>
-      </section>
-
-      <section class="card" aria-labelledby="expenses-title">
-        <h2 id="expenses-title">Spending</h2>
-        <div id="expenses"></div>
-      </section>
-
-      <section class="card" aria-labelledby="flash-title">
-        <h2 id="flash-title">Flashcards</h2>
-        <p class="hint">Press to flip on the glasses, swipe down for "got it", up for "again". Cards come back on a spaced schedule.</p>
-        <div id="flashcards"></div>
-      </section>
-
-      <section class="card" aria-labelledby="home-title">
-        <h2 id="home-title">Smart home</h2>
-        <p class="hint">"EDITH, lights off." Uses webhooks from Home Assistant Cloud or IFTTT.</p>
-        <div id="smarthome"></div>
-      </section>
-
-      <section class="card" aria-labelledby="sos-title">
-        <h2 id="sos-title">Emergency</h2>
-        <div id="emergency"></div>
-      </section>
-
-      <section class="card" aria-labelledby="backup-title">
-        <h2 id="backup-title">Backup</h2>
-        <p class="hint">Move EDITH to a new phone, or keep a copy before reinstalling.</p>
-        <div id="backup"></div>
-      </section>
-
-      <section class="card" aria-labelledby="diag-title">
-        <h2 id="diag-title">Connection test</h2>
-        <p class="hint">
-          Checks each service from this exact app. Run it inside the Even app on your
-          phone: that's the environment that counts.
-        </p>
-        <div id="diagnostics"></div>
-      </section>
-
-      <p class="credit">
-        Map tiles © Esri, HERE, Garmin, © OpenStreetMap contributors. Places by Photon. Walking routes by OSRM on
-        FOSSGIS servers. Transit by Transitous. Weather by Open-Meteo. Crypto prices by CoinGecko. Scores from ESPN.
-        Aircraft positions from adsb.lol (fetched by your calendar script), routes and types from adsbdb. ISS position from wheretheiss.at. Emergency services from OpenStreetMap via Overpass and Photon.
-      </p>
+      <!-- Emergency: reached from the SOS button, not the tab bar. -->
+      <div class="panel" data-panel="sos" hidden>
+        <section class="card sos-card" aria-labelledby="sos-title">
+          <h2 id="sos-title">Emergency</h2>
+          <div id="emergency"></div>
+        </section>
+      </div>
     </main>
+
+    <nav class="tabbar" aria-label="Sections">
+      <button type="button" data-tab="glasses">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6.5" cy="13" r="3.5" /><circle cx="17.5" cy="13" r="3.5" /><path d="M10 13h4M3 13V9l2-3M21 13V9l-2-3" /></svg>
+        Glasses
+      </button>
+      <button type="button" data-tab="organiser">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01" /></svg>
+        Organiser
+      </button>
+      <button type="button" data-tab="studio">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="3" width="16" height="18" rx="2" /><path d="M8 8h8M8 12h8M8 16h5" /></svg>
+        Studio
+      </button>
+      <button type="button" data-tab="settings">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3" /><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1" /></svg>
+        Settings
+      </button>
+    </nav>
     <script type="module" src="./src/main.ts"></script>
   </body>
 </html>

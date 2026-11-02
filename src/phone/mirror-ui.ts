@@ -16,32 +16,54 @@ const LEVEL_OPACITY = [0.25, 0.42, 0.62, 0.82, 1]
 
 const sys = (eventType?: OsEventTypeList) => ({ sysEvent: { eventType } }) as unknown as EvenHubEvent
 
-const CHIPS: [string, Action | 'boot'][] = [
-  ['Dashboard', { type: 'dashboard' }],
-  ['Map', { type: 'map' }],
-  ['Radar: cafés', { type: 'radar', category: 'cafe' }],
-  ['Captions', { type: 'captions', translate: false }],
-  ['Translate', { type: 'captions', translate: true }],
-  ['Teleprompter', { type: 'teleprompter' }],
-  ['Briefing', { type: 'briefing' }],
-  ['Meeting', { type: 'meeting' }],
-  ['Navigate: pharmacy', { type: 'navigate', category: 'pharmacy' }],
-  ['Recipe', { type: 'guide' }],
-  ['Walk tracker', { type: 'activity', kind: 'walk' }],
-  ['Diagnostics', { type: 'diagnostics' }],
-  ['Debrief', { type: 'debrief' }],
-  ['Flashcards', { type: 'flashcards' }],
-  ['Voice teleprompter', { type: 'teleprompter', follow: true }],
-  ['Emergency', { type: 'emergency' }],
-  ["What's new", { type: 'whatsnew' }],
-  ['Hands-free on', { type: 'handsfree', on: true }],
-  ['Hands-free off', { type: 'handsfree', on: false }],
-  ['Focus', { type: 'protocol', name: 'focus' }],
-  ['Night', { type: 'protocol', name: 'night' }],
-  ['Stealth', { type: 'protocol', name: 'stealth' }],
-  ['Standard', { type: 'protocol', name: 'standard' }],
-  ['Replay boot', 'boot'],
+type Chip = [string, Action | 'boot']
+
+const GROUPS: [string, Chip[]][] = [
+  [
+    'Views',
+    [
+      ['Dashboard', { type: 'dashboard' }],
+      ['Briefing', { type: 'briefing' }],
+      ['Debrief', { type: 'debrief' }],
+      ['Map', { type: 'map' }],
+      ['Radar: cafés', { type: 'radar', category: 'cafe' }],
+      ['Navigate: pharmacy', { type: 'navigate', category: 'pharmacy' }],
+    ],
+  ],
+  [
+    'Listen and show',
+    [
+      ['Captions', { type: 'captions', translate: false }],
+      ['Translate', { type: 'captions', translate: true }],
+      ['Meeting', { type: 'meeting' }],
+      ['Teleprompter', { type: 'teleprompter' }],
+      ['Voice teleprompter', { type: 'teleprompter', follow: true }],
+      ['Recipe', { type: 'guide' }],
+      ['Flashcards', { type: 'flashcards' }],
+      ['Walk tracker', { type: 'activity', kind: 'walk' }],
+    ],
+  ],
+  [
+    'Protocols',
+    [
+      ['Standard', { type: 'protocol', name: 'standard' }],
+      ['Focus', { type: 'protocol', name: 'focus' }],
+      ['Night', { type: 'protocol', name: 'night' }],
+      ['Stealth', { type: 'protocol', name: 'stealth' }],
+    ],
+  ],
+  [
+    'System',
+    [
+      ['Diagnostics', { type: 'diagnostics' }],
+      ['Hands-free on', { type: 'handsfree', on: true }],
+      ['Hands-free off', { type: 'handsfree', on: false }],
+      ["What's new", { type: 'whatsnew' }],
+      ['Replay boot', 'boot'],
+    ],
+  ],
 ]
+const CHIPS = GROUPS.flatMap(([, chips]) => chips)
 
 /** Live copy of the HUD plus controls, for demos and handing the glasses to someone else. */
 export function mountMirror(root: HTMLElement, display: Display, remote: Remote) {
@@ -60,7 +82,15 @@ export function mountMirror(root: HTMLElement, display: Display, remote: Remote)
         <input type="text" placeholder="Type to EDITH" aria-label="Type a request to EDITH" />
         <button type="submit">Send</button>
       </form>
-      <div class="chips">${CHIPS.map(([label], i) => `<button type="button" class="chip" data-chip="${i}">${label}</button>`).join('')}</div>
+      <details class="shortcuts">
+        <summary>Shortcuts</summary>
+        ${GROUPS.map(
+          ([name, chips]) =>
+            `<h3 class="sub">${name}</h3><div class="chips">${chips
+              .map(([label]) => `<button type="button" class="chip" data-chip="${CHIPS.findIndex((c) => c[0] === label)}">${label}</button>`)
+              .join('')}</div>`,
+        ).join('')}
+      </details>
       <button type="button" class="exit">Exit app on glasses</button>
     </div>`
 

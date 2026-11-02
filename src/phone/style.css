@@ -25,7 +25,136 @@ body {
 #phone {
   max-width: 560px;
   margin: 0 auto;
-  padding: max(20px, env(safe-area-inset-top)) 16px max(32px, env(safe-area-inset-bottom));
+  /* Bottom padding clears the fixed tab bar. */
+  padding: max(20px, env(safe-area-inset-top)) 16px calc(88px + env(safe-area-inset-bottom));
+}
+
+.masthead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.sos {
+  flex: none;
+  padding: 8px 14px;
+  border-radius: 999px;
+  border-color: var(--bad);
+  color: var(--bad);
+  font: 700 13px var(--mono);
+  letter-spacing: 0.12em;
+}
+
+.sos[aria-current='page'] {
+  background: var(--bad);
+  color: #1a0505;
+}
+
+.sos-card {
+  border-color: var(--bad);
+}
+
+/* Bottom tab bar. */
+.tabbar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 10;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  max-width: 560px;
+  margin: 0 auto;
+  padding: 6px 8px calc(6px + env(safe-area-inset-bottom));
+  background: rgba(5, 8, 6, 0.94);
+  border-top: 1px solid var(--line);
+  backdrop-filter: blur(8px);
+}
+
+.tabbar button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 6px 2px;
+  border: 0;
+  border-radius: 10px;
+  color: var(--dim);
+  font: 600 11px -apple-system, system-ui, sans-serif;
+}
+
+.tabbar svg {
+  width: 22px;
+  height: 22px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.tabbar button[aria-current='page'] {
+  color: var(--accent);
+  background: var(--panel);
+}
+
+.shortcuts > summary {
+  padding: 10px 0;
+  color: var(--dim);
+  font: 600 13px var(--mono);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.shortcuts .sub {
+  margin-top: 8px;
+}
+
+/* Settings cards fold to their title. */
+.fold {
+  padding: 0;
+}
+
+.fold > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px;
+  list-style: none;
+  cursor: pointer;
+}
+
+.fold > summary::-webkit-details-marker {
+  display: none;
+}
+
+.fold > summary h2 {
+  margin: 0;
+}
+
+.fold > summary::after {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid var(--dim);
+  border-bottom: 2px solid var(--dim);
+  transform: rotate(45deg);
+  transition: transform 0.15s;
+}
+
+.fold[open] > summary::after {
+  transform: rotate(-135deg);
+}
+
+.fold > :not(summary) {
+  margin-left: 16px;
+  margin-right: 16px;
+}
+
+.fold > :last-child {
+  margin-bottom: 16px;
 }
 
 .masthead h1 {

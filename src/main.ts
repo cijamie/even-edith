@@ -31,6 +31,7 @@ import { mountFlashcards } from './phone/flashcards-ui'
 import { mountSmartHome } from './phone/smarthome-ui'
 import { mountBackup } from './phone/backup-ui'
 import { mountEmergency } from './phone/emergency-ui'
+import { mountTabs } from './phone/tabs'
 import { Display } from './hud/display'
 import { ID } from './hud/layout'
 import { boot } from './hud/boot'
@@ -96,6 +97,13 @@ if (new URLSearchParams(location.search).has('probe')) {
   }
 
   // Phone UI. Works without glasses too (desktop browser, GitHub Pages).
+  const showTab = mountTabs()
+  const keys = await settings.all()
+  if (!keys.groq || !keys.gemini) {
+    // First run: straight to the keys, open.
+    showTab('settings')
+    document.querySelector<HTMLDetailsElement>('#keys-card')!.open = true
+  }
   mountMirror(document.getElementById('mirror')!, display, {
     event: (e) => ready && assistant.handle(e),
     say: (text) => ready && void assistant.handleText(text),

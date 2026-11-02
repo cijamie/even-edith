@@ -1,8 +1,13 @@
 // Keep in step with package.json and app.json.
-export const VERSION = '0.6.0'
+export const VERSION = '0.6.1'
 
 /** Shown once on the glasses after an update, newest first. Short lines: it's a small screen. */
 export const WHATS_NEW: Record<string, string[]> = {
+  '0.6.1': [
+    'Phone app tidied into tabs: Glasses,',
+    'Organiser, Studio and Settings',
+    'SOS button always at the top',
+  ],
   '0.6.0': [
     '"What plane is that?" and ISS passes',
     '"Emergency": nearest A&E, police, defib',
