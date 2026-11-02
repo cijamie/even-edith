@@ -1,31 +1,33 @@
-// Generates public/icon.png: the 24x24 greyscale Even Hub icon. Even Hub reads it
-// in 2x2 blocks, so it's drawn on a 12x12 grid: the logo's glasses, with the arc
-// reactor core in the left lens and HUD lines in the right (see assets/logo-mark.svg).
+// Generates public/icon.png: the 24x24 Even Hub icon. Even Hub reads it in 2x2
+// blocks and allows one colour (opaque #F4F4F4) on transparent, so it's drawn
+// on a 12x12 grid: the logo's glasses, with the arc reactor core in the left
+// lens and HUD lines in the right (see assets/logo-mark.svg).
 import { deflateSync } from 'node:zlib'
 import { mkdirSync, writeFileSync } from 'node:fs'
 
-// # frame, @ reactor core, + reactor glow, - HUD line, . empty
+// # frame, @ reactor core, - HUD line, . transparent
 const GRID = [
   '............',
   '............',
   '#..........#',
   '.####..####.',
-  '#.++.##....#',
-  '#+@@+##.--.#',
-  '#+@@+##....#',
-  '#.++.##.-..#',
+  '#....##....#',
+  '#.@@.##.--.#',
+  '#.@@.##....#',
+  '#....##.-..#',
   '.####..####.',
   '............',
   '............',
   '............',
 ]
-const SHADE = { '#': 255, '@': 255, '+': 110, '-': 170, '.': 0 }
+const ON = [0xf4, 0xf4, 0xf4, 0xff]
+const OFF = [0, 0, 0, 0]
 
 const size = 24
 const rows = []
 for (let y = 0; y < size; y++) {
   const row = [0] // PNG filter byte: none
-  for (let x = 0; x < size; x++) row.push(SHADE[GRID[y >> 1][x >> 1]])
+  for (let x = 0; x < size; x++) row.push(...(GRID[y >> 1][x >> 1] === '.' ? OFF : ON))
   rows.push(Buffer.from(row))
 }
 
@@ -52,7 +54,7 @@ const ihdr = Buffer.alloc(13)
 ihdr.writeUInt32BE(size, 0)
 ihdr.writeUInt32BE(size, 4)
 ihdr[8] = 8 // bit depth
-ihdr[9] = 0 // greyscale
+ihdr[9] = 6 // RGBA
 
 const png = Buffer.concat([
   Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
