@@ -1,8 +1,9 @@
 // Keep in step with package.json and app.json.
-export const VERSION = '0.6.1'
+export const VERSION = '0.6.2'
 
 /** Shown once on the glasses after an update, newest first. Short lines: it's a small screen. */
 export const WHATS_NEW: Record<string, string[]> = {
+  '0.6.2': ['A new Even EDITH logo and app icon'],
   '0.6.1': [
     'Phone app tidied into tabs: Glasses,',
     'Organiser, Studio and Settings',
